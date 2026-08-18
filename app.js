@@ -226,7 +226,88 @@ function escapeHtml(s) {
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
   }[ch]));
 }
+async function findAddressLocation() {
+  const address = el("customerAddress").value.trim();
 
+  if (!address) {
+    return alert("Enter an address, village or landmark first.");
+  }
+
+  const btn = el("findLocationBtn");
+  const status = el("locationStatus");
+
+  btn.disabled = true;
+  btn.textContent = "Searching…";
+  status.textContent = "Looking for the address…";
+
+  try {
+    const query = /greece|ελλάδα/i.test(address)
+      ? address
+      : `${address}, Greece`;
+
+    const url =
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=gr&q=${encodeURIComponent(query)}`;
+
+    const res = await fetch(url, {
+      headers: { "Accept": "application/json" }
+    });
+
+    if (!res.ok) {
+      throw new Error(`Search failed (${res.status})`);
+    }
+
+    const results = await res.json();
+
+    if (!results.length) {
+      status.textContent =
+        "No location found. Add more detail or use current GPS when you arrive.";
+      return;
+    }
+
+    const best = results[0];
+
+    el("lat").value = Number(best.lat).toFixed(6);
+    el("lng").value = Number(best.lon).toFixed(6);
+
+    status.textContent = `📍 Found: ${best.display_name}`;
+
+  } catch (err) {
+    status.textContent = "Could not search the address.";
+    alert("Address lookup failed: " + err.message);
+
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔎 Find location";
+  }
+}
+
+function checkEnteredLocation() {
+  const lat = Number(el("lat").value);
+  const lng = Number(el("lng").value);
+
+  let q = "";
+
+  if (
+    el("lat").value !== "" &&
+    el("lng").value !== "" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+  ) {
+    q = `${lat},${lng}`;
+  } else {
+    q = el("customerAddress").value.trim();
+  }
+
+  if (!q) {
+    return alert("Enter an address or save/find a GPS location first.");
+  }
+
+  window.open(
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+    "_blank",
+    "noopener"
+  );
+}
 function openCustomerDialog(c=null) {
   form.reset();
   el("serviceMin").value = 7;
@@ -298,7 +379,8 @@ el("saveGpsBtn").onclick = () => {
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
 };
-
+el("findLocationBtn").onclick = findAddressLocation;
+el("checkMapBtn").onclick = checkEnteredLocation;
 el("newCustomerBtn").onclick = () => openCustomerDialog();
 el("searchInput").oninput = renderCustomers;
 
