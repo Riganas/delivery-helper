@@ -4,9 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#111827" />
-
   <title>Delivery Helper</title>
-
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -47,21 +45,21 @@
 
     </div>
 
-
-    <div id="optimizerStatus" class="subtle" style="margin-bottom:10px">
+    <div
+      id="optimizerStatus"
+      class="subtle"
+      style="margin-bottom:10px"
+    >
       Route not optimized yet.
     </div>
 
-
     <div id="carousel" class="carousel"></div>
-
 
     <div id="emptyRoute" class="empty">
       No stops selected for today yet.
     </div>
 
   </section>
-
 
 
   <!-- BUILD ROUTE -->
@@ -82,7 +80,10 @@
       placeholder="18452 10&#10;22107 6&#10;19631 15"
     ></textarea>
 
-    <div class="actions" style="margin-top:10px">
+    <div
+      class="actions"
+      style="margin-top:10px"
+    >
 
       <button
         id="buildRouteBtn"
@@ -102,7 +103,6 @@
   </section>
 
 
-
   <!-- TODAY -->
 
   <section class="panel">
@@ -111,16 +111,21 @@
 
       <h2>Today</h2>
 
-      <button id="completeCurrentBtn" class="primary">
+      <button
+        id="completeCurrentBtn"
+        class="primary"
+      >
         ✓ Delivered current
       </button>
 
     </div>
 
-    <div id="todayList" class="today-list"></div>
+    <div
+      id="todayList"
+      class="today-list"
+    ></div>
 
   </section>
-
 
 
   <!-- CUSTOMERS -->
@@ -131,7 +136,10 @@
 
       <h2>Customers</h2>
 
-      <button id="newCustomerBtn" class="primary">
+      <button
+        id="newCustomerBtn"
+        class="primary"
+      >
         + New customer
       </button>
 
@@ -143,10 +151,12 @@
       placeholder="Search by ID, name, phone or area"
     />
 
-    <div id="customerList" class="customer-list"></div>
+    <div
+      id="customerList"
+      class="customer-list"
+    ></div>
 
   </section>
-
 
 
   <!-- ROUTING SETTINGS -->
@@ -168,7 +178,6 @@
         placeholder="Paste your API key here"
         autocomplete="off"
       />
-
     </label>
 
     <div class="actions">
@@ -198,7 +207,6 @@
   </section>
 
 
-
   <!-- BACKUP -->
 
   <section class="panel">
@@ -207,7 +215,10 @@
 
     <div class="backup-actions">
 
-      <button id="exportBtn" class="secondary">
+      <button
+        id="exportBtn"
+        class="secondary"
+      >
         Export data
       </button>
 
@@ -234,12 +245,14 @@
 </main>
 
 
-
-<!-- CUSTOMER WINDOW -->
+<!-- CUSTOMER DIALOG -->
 
 <dialog id="customerDialog">
 
-  <form method="dialog" id="customerForm">
+  <form
+    method="dialog"
+    id="customerForm"
+  >
 
     <div class="dialog-head">
 
@@ -247,14 +260,19 @@
         Customer
       </h2>
 
-      <button value="cancel" class="ghost">
+      <button
+        value="cancel"
+        class="ghost"
+      >
         ✕
       </button>
 
     </div>
 
-
-    <input type="hidden" id="editKey" />
+    <input
+      type="hidden"
+      id="editKey"
+    />
 
 
     <label>
@@ -278,16 +296,29 @@
 
 
     <label>
-      Address / area
+      Tax / company address
 
       <input
-        id="customerAddress"
-        placeholder="Village, street, landmark..."
+        id="taxAddress"
+        placeholder="Address shown on company record"
       />
     </label>
 
 
-    <div class="actions" style="margin:-2px 0 12px">
+    <label>
+      Delivery address
+
+      <input
+        id="deliveryAddress"
+        placeholder="Where the truck actually delivers"
+      />
+    </label>
+
+
+    <div
+      class="actions"
+      style="margin:-2px 0 12px"
+    >
 
       <button
         type="button"
@@ -365,27 +396,66 @@
     </div>
 
 
+    <label>
+      Typical service minutes
+
+      <input
+        id="serviceMin"
+        type="number"
+        min="0"
+        value="7"
+      />
+    </label>
+
+
+    <p class="subtle">
+      <b>Usual shop/opening hours (optional).</b>
+      Leave blank for normal customers.
+    </p>
+
+
     <div class="grid2">
 
       <label>
-        Default service min
+        Opening 1 from
 
         <input
-          id="serviceMin"
-          type="number"
-          min="0"
-          value="7"
+          id="open1Start"
+          type="time"
         />
       </label>
 
 
       <label>
-        Tomorrow quantity
+        Opening 1 to
 
         <input
-          id="quantity"
-          type="number"
-          min="0"
+          id="open1End"
+          type="time"
+        />
+      </label>
+
+    </div>
+
+
+    <div class="grid2">
+
+      <label>
+        Opening 2 from
+
+        <input
+          id="open2Start"
+          type="time"
+        />
+      </label>
+
+
+      <label>
+        Opening 2 to
+
+        <input
+          id="open2End"
+          type="time"
         />
       </label>
 
@@ -423,7 +493,6 @@
         📍 Use my current location
       </button>
 
-
       <button
         type="submit"
         class="primary"
@@ -437,6 +506,126 @@
 
 </dialog>
 
+
+<!-- DELIVERY DETAILS DIALOG -->
+
+<dialog id="deliveryDialog">
+
+  <form
+    method="dialog"
+    id="deliveryForm"
+  >
+
+    <div class="dialog-head">
+
+      <h2 id="deliveryDialogTitle">
+        Delivery details
+      </h2>
+
+      <button
+        value="cancel"
+        class="ghost"
+      >
+        ✕
+      </button>
+
+    </div>
+
+
+    <label>
+      Quantity
+
+      <input
+        id="deliveryQuantity"
+        inputmode="numeric"
+      />
+    </label>
+
+
+    <label>
+      Delivery time rule
+
+      <select id="timeRule">
+
+        <option value="none">
+          No restriction
+        </option>
+
+        <option value="window">
+          Time window
+        </option>
+
+        <option value="after">
+          After a time
+        </option>
+
+        <option value="before">
+          Before a time
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <label id="timeStartWrap">
+      From / after
+
+      <input
+        id="timeStart"
+        type="time"
+      />
+    </label>
+
+
+    <label id="timeEndWrap">
+      To / before
+
+      <input
+        id="timeEnd"
+        type="time"
+      />
+    </label>
+
+
+    <label>
+      Call before arrival (minutes)
+
+      <input
+        id="callBeforeMin"
+        type="number"
+        min="0"
+        step="5"
+        value="0"
+      />
+    </label>
+
+
+    <label>
+      Tomorrow's special delivery note
+
+      <textarea
+        id="deliveryNote"
+        rows="3"
+        placeholder="Call office, use back entrance, delivery only after lunch..."
+      ></textarea>
+    </label>
+
+
+    <div class="dialog-actions">
+
+      <button
+        type="submit"
+        class="primary"
+      >
+        Save delivery details
+      </button>
+
+    </div>
+
+  </form>
+
+</dialog>
 
 
 <!-- STOP CARD -->
