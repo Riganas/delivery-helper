@@ -1,5 +1,7 @@
 const STORAGE_KEY = "delivery-helper-v1";
-const API_KEY_STORAGE = "delivery-helper-ors-key";
+
+const API_KEY_STORAGE =
+  "delivery-helper-ors-key";
 
 const ORS_OPTIMIZATION_URL =
   "https://api.heigit.org/vroom/v0";
@@ -9,23 +11,31 @@ let state = loadState();
 
 let deferredPrompt = null;
 
+let editingDeliveryKey = null;
+
 
 const el =
-  id => document.getElementById(id);
+  id =>
+    document.getElementById(id);
 
 
-const dialog =
+const customerDialog =
   el("customerDialog");
 
-
-const form =
+const customerForm =
   el("customerForm");
 
+const deliveryDialog =
+  el("deliveryDialog");
+
+const deliveryForm =
+  el("deliveryForm");
 
 
-// ----------------------------------------------------
+
+// ---------------------------------------------------
 // DATA
-// ----------------------------------------------------
+// ---------------------------------------------------
 
 function loadState() {
 
@@ -36,26 +46,19 @@ function loadState() {
         STORAGE_KEY
       );
 
-
     if (raw) {
-
       return JSON.parse(raw);
-
     }
 
   } catch {}
 
 
   return {
-
     customers: [],
-
     today: []
-
   };
 
 }
-
 
 
 function saveState() {
@@ -65,11 +68,9 @@ function saveState() {
     JSON.stringify(state)
   );
 
-
   render();
 
 }
-
 
 
 function customerByKey(key) {
@@ -81,15 +82,14 @@ function customerByKey(key) {
 }
 
 
-
 function todayItemByKey(key) {
 
   return state.today.find(
-    x => x.customerKey === key
+    x =>
+      x.customerKey === key
   );
 
 }
-
 
 
 function displayName(c) {
@@ -104,16 +104,30 @@ function displayName(c) {
 }
 
 
+function cleanPhone(p) {
 
-function coordsValid(c) {
-
-  return (
-    Number.isFinite(Number(c?.lat)) &&
-    Number.isFinite(Number(c?.lng))
+  return String(
+    p || ""
+  ).replace(
+    /[^\d+]/g,
+    ""
   );
 
 }
 
+
+function coordsValid(c) {
+
+  return (
+    Number.isFinite(
+      Number(c?.lat)
+    ) &&
+    Number.isFinite(
+      Number(c?.lng)
+    )
+  );
+
+}
 
 
 function escapeHtml(s) {
@@ -134,23 +148,214 @@ function escapeHtml(s) {
 }
 
 
+function pad2(n) {
 
-function cleanPhone(p) {
+  return String(n)
+    .padStart(2, "0");
 
-  return String(
-    p || ""
-  ).replace(
-    /[^\d+]/g,
-    ""
+}
+
+
+function hhmmFromEpoch(sec) {
+
+  if (
+    !Number.isFinite(
+      Number(sec)
+    )
+  ) {
+    return "";
+  }
+
+  const d =
+    new Date(
+      Number(sec) * 1000
+    );
+
+  return (
+    pad2(d.getHours()) +
+    ":" +
+    pad2(d.getMinutes())
+  );
+
+}
+
+
+function todayAt(hhmm) {
+
+  if (!hhmm) {
+    return null;
+  }
+
+  const [h, m] =
+    hhmm
+      .split(":")
+      .map(Number);
+
+  if (
+    !Number.isFinite(h) ||
+    !Number.isFinite(m)
+  ) {
+    return null;
+  }
+
+  const d =
+    new Date();
+
+  d.setHours(
+    h,
+    m,
+    0,
+    0
+  );
+
+  return Math.floor(
+    d.getTime() / 1000
+  );
+
+}
+
+
+function endOfToday() {
+
+  const d =
+    new Date();
+
+  d.setHours(
+    23,
+    59,
+    59,
+    0
+  );
+
+  return Math.floor(
+    d.getTime() / 1000
+  );
+
+}
+
+
+function startOfToday() {
+
+  const d =
+    new Date();
+
+  d.setHours(
+    0,
+    0,
+    0,
+    0
+  );
+
+  return Math.floor(
+    d.getTime() / 1000
   );
 
 }
 
 
 
-// ----------------------------------------------------
-// PHONE + NAVIGATION
-// ----------------------------------------------------
+// ---------------------------------------------------
+// DELIVERY TEXT
+// ---------------------------------------------------
+
+function formatRule(t) {
+
+  if (!t) {
+    return "";
+  }
+
+
+  if (
+    t.timeRule === "window" &&
+    t.timeStart &&
+    t.timeEnd
+  ) {
+
+    return (
+      "🕒 " +
+      t.timeStart +
+      "–" +
+      t.timeEnd
+    );
+
+  }
+
+
+  if (
+    t.timeRule === "after" &&
+    t.timeStart
+  ) {
+
+    return (
+      "🕒 After " +
+      t.timeStart
+    );
+
+  }
+
+
+  if (
+    t.timeRule === "before" &&
+    t.timeEnd
+  ) {
+
+    return (
+      "🕒 Before " +
+      t.timeEnd
+    );
+
+  }
+
+
+  return "";
+
+}
+
+
+function callReminderText(t) {
+
+  if (
+    !t?.callBeforeMin
+  ) {
+
+    return "";
+
+  }
+
+
+  if (t.eta) {
+
+    const callAt =
+      Number(t.eta) -
+      Number(
+        t.callBeforeMin
+      ) * 60;
+
+
+    return (
+      "📞 Call about " +
+      hhmmFromEpoch(callAt) +
+      " (" +
+      t.callBeforeMin +
+      " min before)"
+    );
+
+  }
+
+
+  return (
+    "📞 Call " +
+    t.callBeforeMin +
+    " min before"
+  );
+
+}
+
+
+
+// ---------------------------------------------------
+// PHONE / NAVIGATION
+// ---------------------------------------------------
 
 function openCall(phone) {
 
@@ -160,11 +365,9 @@ function openCall(phone) {
 
   if (!p) {
 
-    alert(
+    return alert(
       "No phone number saved."
     );
-
-    return;
 
   }
 
@@ -175,52 +378,58 @@ function openCall(phone) {
 }
 
 
-
 function navigate(c) {
 
   let destination = "";
 
 
-  if (coordsValid(c)) {
+  if (
+    coordsValid(c)
+  ) {
 
     destination =
       `${c.lat},${c.lng}`;
 
-  } else if (c.address) {
+  }
+
+  else if (
+    c.deliveryAddress ||
+    c.address
+  ) {
 
     destination =
+      c.deliveryAddress ||
       c.address;
 
-  } else {
+  }
 
-    alert(
-      "No GPS coordinates or address saved."
+  else {
+
+    return alert(
+      "No GPS coordinates or delivery address saved."
     );
-
-    return;
 
   }
 
 
   location.href =
     "https://www.google.com/maps/dir/?api=1&destination=" +
-    encodeURIComponent(destination);
+    encodeURIComponent(
+      destination
+    );
 
 }
 
 
 
-// ----------------------------------------------------
-// TODAY ROUTE
-// ----------------------------------------------------
+// ---------------------------------------------------
+// TODAY
+// ---------------------------------------------------
 
 function addToToday(c) {
 
   if (
-    state.today.some(
-      x =>
-        x.customerKey === c.key
-    )
+    todayItemByKey(c.key)
   ) {
 
     return;
@@ -240,7 +449,25 @@ function addToToday(c) {
       false,
 
     order:
-      state.today.length
+      state.today.length,
+
+    timeRule:
+      "none",
+
+    timeStart:
+      "",
+
+    timeEnd:
+      "",
+
+    callBeforeMin:
+      0,
+
+    deliveryNote:
+      "",
+
+    eta:
+      null
 
   });
 
@@ -248,7 +475,6 @@ function addToToday(c) {
   saveState();
 
 }
-
 
 
 function removeFromToday(key) {
@@ -271,23 +497,24 @@ function removeFromToday(key) {
 }
 
 
-
 function markDone(key) {
 
   const item =
     todayItemByKey(key);
 
 
-  if (!item) return;
+  if (!item) {
+    return;
+  }
 
 
-  item.done = true;
+  item.done =
+    true;
 
 
   saveState();
 
 }
-
 
 
 function currentUndone() {
@@ -307,9 +534,9 @@ function currentUndone() {
 
 
 
-// ----------------------------------------------------
+// ---------------------------------------------------
 // RENDER
-// ----------------------------------------------------
+// ---------------------------------------------------
 
 function render() {
 
@@ -322,7 +549,6 @@ function render() {
   renderCustomers();
 
 }
-
 
 
 function renderSummary() {
@@ -344,6 +570,10 @@ function renderSummary() {
 }
 
 
+
+// ---------------------------------------------------
+// NEXT 5 CARDS
+// ---------------------------------------------------
 
 function makeCard(
   t,
@@ -397,7 +627,9 @@ function makeCard(
   const parts = [];
 
 
-  if (t.quantity) {
+  if (
+    t.quantity
+  ) {
 
     parts.push(
       `${t.quantity} units`
@@ -406,10 +638,23 @@ function makeCard(
   }
 
 
-  if (c.address) {
+  if (
+    t.eta
+  ) {
 
     parts.push(
-      c.address
+      `ETA ~${hhmmFromEpoch(t.eta)}`
+    );
+
+  }
+
+
+  if (
+    formatRule(t)
+  ) {
+
+    parts.push(
+      formatRule(t)
     );
 
   }
@@ -424,7 +669,9 @@ function makeCard(
       "🟢 Verified GPS"
     );
 
-  } else if (
+  }
+
+  else if (
     coordsValid(c)
   ) {
 
@@ -445,6 +692,8 @@ function makeCard(
     ".stop-notes"
   ).textContent =
     [
+      callReminderText(t),
+      t.deliveryNote,
       c.companyNotes,
       c.myNotes
     ]
@@ -452,38 +701,40 @@ function makeCard(
       .join("\n");
 
 
-  const call1 =
+  const b1 =
     node.querySelector(
       ".call1"
     );
 
 
-  const call2 =
+  const b2 =
     node.querySelector(
       ".call2"
     );
 
 
-  call1.onclick =
+  b1.onclick =
     () =>
       openCall(c.phone1);
 
 
-  call2.onclick =
+  b2.onclick =
     () =>
       openCall(c.phone2);
 
 
   if (!c.phone1) {
 
-    call1.disabled = true;
+    b1.disabled =
+      true;
 
   }
 
 
   if (!c.phone2) {
 
-    call2.disabled = true;
+    b2.disabled =
+      true;
 
   }
 
@@ -507,14 +758,14 @@ function makeCard(
 }
 
 
-
 function renderCarousel() {
 
   const box =
     el("carousel");
 
 
-  box.innerHTML = "";
+  box.innerHTML =
+    "";
 
 
   const items =
@@ -567,24 +818,32 @@ function renderCarousel() {
 
 
 
+// ---------------------------------------------------
+// TODAY LIST
+// ---------------------------------------------------
+
 function renderToday() {
 
   const box =
     el("todayList");
 
 
-  box.innerHTML = "";
+  box.innerHTML =
+    "";
 
 
   const items =
     [...state.today]
+
       .sort(
         (a, b) =>
           a.order - b.order
       );
 
 
-  if (!items.length) {
+  if (
+    !items.length
+  ) {
 
     box.innerHTML =
       '<div class="subtle">No stops in today\'s route.</div>';
@@ -603,10 +862,13 @@ function renderToday() {
         );
 
 
-      if (!c) return;
+      if (!c) {
+        return;
+      }
 
 
-      let gps = "";
+      let gps =
+        "";
 
 
       if (
@@ -617,7 +879,9 @@ function renderToday() {
         gps =
           "🟢 Verified GPS";
 
-      } else if (
+      }
+
+      else if (
         coordsValid(c)
       ) {
 
@@ -635,7 +899,9 @@ function renderToday() {
 
       row.className =
         "row" +
-        (t.done ? " done" : "");
+        (t.done
+          ? " done"
+          : "");
 
 
       row.innerHTML = `
@@ -643,12 +909,7 @@ function renderToday() {
         <div class="row-main">
 
           <div class="row-title">
-
-            ${i + 1}.
-            ${escapeHtml(
-              displayName(c)
-            )}
-
+            ${i + 1}. ${escapeHtml(displayName(c))}
           </div>
 
           <div class="row-sub">
@@ -659,7 +920,17 @@ function renderToday() {
                   ? t.quantity + " units"
                   : "",
 
-                c.address || "",
+                t.eta
+                  ? "ETA ~" + hhmmFromEpoch(t.eta)
+                  : "",
+
+                formatRule(t),
+
+                callReminderText(t),
+
+                c.deliveryAddress ||
+                c.address ||
+                "",
 
                 gps
               ]
@@ -674,6 +945,10 @@ function renderToday() {
 
         <div class="row-actions">
 
+          <button data-act="details">
+            Schedule
+          </button>
+
           <button data-act="call">
             📞
           </button>
@@ -683,11 +958,7 @@ function renderToday() {
           </button>
 
           <button data-act="done">
-
-            ${t.done
-              ? "↩ Undo"
-              : "✓ Done"}
-
+            ${t.done ? "↩ Undo" : "✓ Done"}
           </button>
 
           <button data-act="remove">
@@ -696,6 +967,15 @@ function renderToday() {
 
         </div>
       `;
+
+
+      row.querySelector(
+        '[data-act="details"]'
+      ).onclick =
+        () =>
+          openDeliveryDialog(
+            c.key
+          );
 
 
       row.querySelector(
@@ -734,7 +1014,9 @@ function renderToday() {
           );
 
 
-      box.appendChild(row);
+      box.appendChild(
+        row
+      );
 
     }
   );
@@ -742,6 +1024,10 @@ function renderToday() {
 }
 
 
+
+// ---------------------------------------------------
+// CUSTOMER LIST
+// ---------------------------------------------------
 
 function renderCustomers() {
 
@@ -756,31 +1042,36 @@ function renderCustomers() {
     el("customerList");
 
 
-  box.innerHTML = "";
+  box.innerHTML =
+    "";
 
 
   const list =
     state.customers
 
-      .filter(c => {
+      .filter(
+        c => {
 
-        const hay =
-          [
-            c.id,
-            c.name,
-            c.address,
-            c.phone1,
-            c.phone2,
-            c.companyNotes,
-            c.myNotes
-          ]
-            .join(" ")
-            .toLowerCase();
+          const hay =
+            [
+              c.id,
+              c.name,
+              c.address,
+              c.taxAddress,
+              c.deliveryAddress,
+              c.phone1,
+              c.phone2,
+              c.companyNotes,
+              c.myNotes
+            ]
+              .join(" ")
+              .toLowerCase();
 
 
-        return hay.includes(q);
+          return hay.includes(q);
 
-      })
+        }
+      )
 
       .sort(
         (a, b) =>
@@ -791,148 +1082,141 @@ function renderCustomers() {
       );
 
 
-  list.forEach(c => {
+  list.forEach(
+    c => {
 
-    const inToday =
-      state.today.some(
-        x =>
-          x.customerKey ===
+      const inToday =
+        !!todayItemByKey(
           c.key
+        );
+
+
+      let gps =
+        "";
+
+
+      if (
+        c.locationSource ===
+        "verified"
+      ) {
+
+        gps =
+          "🟢 Verified";
+
+      }
+
+      else if (
+        coordsValid(c)
+      ) {
+
+        gps =
+          "🟡 Approximate";
+
+      }
+
+
+      const row =
+        document.createElement(
+          "div"
+        );
+
+
+      row.className =
+        "row";
+
+
+      row.innerHTML = `
+
+        <div class="row-main">
+
+          <div class="row-title">
+            ${escapeHtml(displayName(c))}
+          </div>
+
+          <div class="row-sub">
+
+            ${escapeHtml(
+              [
+                c.deliveryAddress ||
+                c.address ||
+                "",
+
+                gps,
+
+                c.phone1 ||
+                ""
+              ]
+                .filter(Boolean)
+                .join(" • ")
+            )}
+
+          </div>
+
+        </div>
+
+
+        <div class="row-actions">
+
+          <button data-act="edit">
+            Edit
+          </button>
+
+          <button data-act="today">
+            ${inToday ? "In today ✓" : "+ Today"}
+          </button>
+
+        </div>
+      `;
+
+
+      row.querySelector(
+        '[data-act="edit"]'
+      ).onclick =
+        () =>
+          openCustomerDialog(c);
+
+
+      row.querySelector(
+        '[data-act="today"]'
+      ).onclick =
+        () =>
+          inToday
+            ? removeFromToday(c.key)
+            : addToToday(c);
+
+
+      box.appendChild(
+        row
       );
-
-
-    let gps = "";
-
-
-    if (
-      c.locationSource ===
-      "verified"
-    ) {
-
-      gps =
-        "🟢 Verified";
-
-    } else if (
-      coordsValid(c)
-    ) {
-
-      gps =
-        "🟡 Approximate";
 
     }
-
-
-    const row =
-      document.createElement(
-        "div"
-      );
-
-
-    row.className =
-      "row";
-
-
-    row.innerHTML = `
-
-      <div class="row-main">
-
-        <div class="row-title">
-
-          ${escapeHtml(
-            displayName(c)
-          )}
-
-        </div>
-
-        <div class="row-sub">
-
-          ${escapeHtml(
-            [
-              c.address || "",
-              gps,
-              c.phone1 || ""
-            ]
-              .filter(Boolean)
-              .join(" • ")
-          )}
-
-        </div>
-
-      </div>
-
-
-      <div class="row-actions">
-
-        <button data-act="edit">
-          Edit
-        </button>
-
-        <button data-act="today">
-
-          ${inToday
-            ? "In today ✓"
-            : "+ Today"}
-
-        </button>
-
-      </div>
-    `;
-
-
-    row.querySelector(
-      '[data-act="edit"]'
-    ).onclick =
-      () =>
-        openCustomerDialog(c);
-
-
-    row.querySelector(
-      '[data-act="today"]'
-    ).onclick =
-      () => {
-
-        if (inToday) {
-
-          removeFromToday(
-            c.key
-          );
-
-        } else {
-
-          addToToday(c);
-
-        }
-
-      };
-
-
-    box.appendChild(row);
-
-  });
+  );
 
 }
 
 
 
-// ----------------------------------------------------
+// ---------------------------------------------------
 // ADDRESS LOOKUP
-// ----------------------------------------------------
+// ---------------------------------------------------
 
 async function findAddressLocation() {
 
   const address =
-    el("customerAddress")
+    el("deliveryAddress")
+      .value
+      .trim() ||
+
+    el("taxAddress")
       .value
       .trim();
 
 
   if (!address) {
 
-    alert(
-      "Enter an address, village or landmark first."
+    return alert(
+      "Enter a delivery address, village or landmark first."
     );
-
-    return;
 
   }
 
@@ -945,7 +1229,9 @@ async function findAddressLocation() {
     el("locationStatus");
 
 
-  btn.disabled = true;
+  btn.disabled =
+    true;
+
 
   btn.textContent =
     "Searching…";
@@ -971,14 +1257,18 @@ async function findAddressLocation() {
       "&limit=5" +
       "&countrycodes=gr" +
       "&q=" +
-      encodeURIComponent(query);
+      encodeURIComponent(
+        query
+      );
 
 
     const response =
       await fetch(url);
 
 
-    if (!response.ok) {
+    if (
+      !response.ok
+    ) {
 
       throw new Error(
         "Address search failed"
@@ -1028,17 +1318,25 @@ async function findAddressLocation() {
       best.display_name;
 
 
-  } catch (error) {
+  }
 
-    console.error(error);
+  catch (error) {
+
+    console.error(
+      error
+    );
 
 
     status.textContent =
       "Could not find address.";
 
-  } finally {
+  }
 
-    btn.disabled = false;
+  finally {
+
+    btn.disabled =
+      false;
+
 
     btn.textContent =
       "🔎 Find location";
@@ -1049,9 +1347,14 @@ async function findAddressLocation() {
 
 
 
+// ---------------------------------------------------
+// CHECK MAP
+// ---------------------------------------------------
+
 function checkEnteredLocation() {
 
-  let q = "";
+  let q =
+    "";
 
 
   const lat =
@@ -1067,19 +1370,25 @@ function checkEnteredLocation() {
 
 
   if (
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
     el("lat").value !== "" &&
-    el("lng").value !== ""
+    el("lng").value !== "" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
   ) {
 
     q =
       `${lat},${lng}`;
 
-  } else {
+  }
+
+  else {
 
     q =
-      el("customerAddress")
+      el("deliveryAddress")
+        .value
+        .trim() ||
+
+      el("taxAddress")
         .value
         .trim();
 
@@ -1088,47 +1397,47 @@ function checkEnteredLocation() {
 
   if (!q) {
 
-    alert(
+    return alert(
       "No location entered."
     );
-
-    return;
 
   }
 
 
   window.open(
+
     "https://www.google.com/maps/search/?api=1&query=" +
     encodeURIComponent(q),
+
     "_blank",
+
     "noopener"
+
   );
 
 }
 
 
 
-// ----------------------------------------------------
+// ---------------------------------------------------
 // CUSTOMER FORM
-// ----------------------------------------------------
+// ---------------------------------------------------
 
 function openCustomerDialog(
   c = null
 ) {
 
-  form.reset();
+  customerForm.reset();
 
 
   el("serviceMin")
-    .value = 7;
-
-
-  el("quantity")
-    .value = "";
+    .value =
+      7;
 
 
   el("locationStatus")
-    .dataset.source = "";
+    .dataset.source =
+      "";
 
 
   el("locationStatus")
@@ -1163,9 +1472,24 @@ function openCustomerDialog(
         c.name || "";
 
 
-    el("customerAddress")
+    /*
+      OLD DATABASE COMPATIBILITY:
+      customers created before this update only
+      have c.address.
+    */
+
+    el("taxAddress")
       .value =
-        c.address || "";
+        c.taxAddress ||
+        c.address ||
+        "";
+
+
+    el("deliveryAddress")
+      .value =
+        c.deliveryAddress ||
+        c.address ||
+        "";
 
 
     el("phone1")
@@ -1193,6 +1517,26 @@ function openCustomerDialog(
         c.serviceMin ?? 7;
 
 
+    el("open1Start")
+      .value =
+        c.open1Start || "";
+
+
+    el("open1End")
+      .value =
+        c.open1End || "";
+
+
+    el("open2Start")
+      .value =
+        c.open2Start || "";
+
+
+    el("open2End")
+      .value =
+        c.open2End || "";
+
+
     el("companyNotes")
       .value =
         c.companyNotes || "";
@@ -1217,7 +1561,9 @@ function openCustomerDialog(
         .textContent =
           "🟢 Verified truck position";
 
-    } else if (
+    }
+
+    else if (
       coordsValid(c)
     ) {
 
@@ -1232,18 +1578,9 @@ function openCustomerDialog(
 
     }
 
+  }
 
-    const today =
-      todayItemByKey(
-        c.key
-      );
-
-
-    el("quantity")
-      .value =
-        today?.quantity ?? "";
-
-  } else {
+  else {
 
     el("dialogTitle")
       .textContent =
@@ -1251,18 +1588,23 @@ function openCustomerDialog(
 
 
     el("editKey")
-      .value = "";
+      .value =
+        "";
 
   }
 
 
-  dialog.showModal();
+  customerDialog.showModal();
 
 }
 
 
 
-form.addEventListener(
+// ---------------------------------------------------
+// SAVE CUSTOMER
+// ---------------------------------------------------
+
+customerForm.addEventListener(
   "submit",
   event => {
 
@@ -1270,12 +1612,16 @@ form.addEventListener(
 
 
     const key =
-      el("editKey").value ||
+      el("editKey")
+        .value ||
+
       crypto.randomUUID();
 
 
     const existing =
-      customerByKey(key);
+      customerByKey(
+        key
+      );
 
 
     const customer = {
@@ -1292,8 +1638,27 @@ form.addEventListener(
           .value
           .trim(),
 
+      taxAddress:
+        el("taxAddress")
+          .value
+          .trim(),
+
+      deliveryAddress:
+        el("deliveryAddress")
+          .value
+          .trim(),
+
+      /*
+        Keep address too so older parts/backups
+        remain compatible.
+      */
+
       address:
-        el("customerAddress")
+        el("deliveryAddress")
+          .value
+          .trim() ||
+
+        el("taxAddress")
           .value
           .trim(),
 
@@ -1341,6 +1706,22 @@ form.addEventListener(
             .value || 7
         ),
 
+      open1Start:
+        el("open1Start")
+          .value,
+
+      open1End:
+        el("open1End")
+          .value,
+
+      open2Start:
+        el("open2Start")
+          .value,
+
+      open2End:
+        el("open2End")
+          .value,
+
       companyNotes:
         el("companyNotes")
           .value
@@ -1361,7 +1742,9 @@ form.addEventListener(
         customer
       );
 
-    } else {
+    }
+
+    else {
 
       state.customers.push(
         customer
@@ -1370,51 +1753,8 @@ form.addEventListener(
     }
 
 
-    const quantity =
-      el("quantity").value;
+    customerDialog.close();
 
-
-    if (
-      quantity !== ""
-    ) {
-
-      let today =
-        todayItemByKey(key);
-
-
-      if (!today) {
-
-        today = {
-
-          customerKey:
-            key,
-
-          quantity,
-
-          done:
-            false,
-
-          order:
-            state.today.length
-
-        };
-
-
-        state.today.push(
-          today
-        );
-
-      } else {
-
-        today.quantity =
-          quantity;
-
-      }
-
-    }
-
-
-    dialog.close();
 
     saveState();
 
@@ -1423,276 +1763,499 @@ form.addEventListener(
 
 
 
-// ----------------------------------------------------
-// PHYSICAL GPS
-// ----------------------------------------------------
+// ---------------------------------------------------
+// SAVE REAL GPS
+// ---------------------------------------------------
 
 el("saveGpsBtn")
-  .onclick = () => {
+  .onclick =
+    () => {
 
-    if (
-      !navigator.geolocation
-    ) {
+      if (
+        !navigator.geolocation
+      ) {
 
-      alert(
-        "GPS is not available."
-      );
-
-      return;
-
-    }
-
-
-    el("saveGpsBtn")
-      .textContent =
-        "Getting GPS…";
-
-
-    navigator.geolocation
-      .getCurrentPosition(
-
-        pos => {
-
-          el("lat")
-            .value =
-              pos.coords
-                .latitude
-                .toFixed(6);
-
-
-          el("lng")
-            .value =
-              pos.coords
-                .longitude
-                .toFixed(6);
-
-
-          el("locationStatus")
-            .dataset.source =
-              "verified";
-
-
-          const accuracy =
-            Math.round(
-              pos.coords
-                .accuracy || 0
-            );
-
-
-          el("locationStatus")
-            .textContent =
-              `🟢 Verified truck position • GPS ±${accuracy} m`;
-
-
-          el("saveGpsBtn")
-            .textContent =
-              "📍 GPS saved";
-
-        },
-
-
-        error => {
-
-          alert(
-            "Could not get GPS: " +
-            error.message
-          );
-
-
-          el("saveGpsBtn")
-            .textContent =
-              "📍 Use my current location";
-
-        },
-
-
-        {
-          enableHighAccuracy:
-            true,
-
-          timeout:
-            15000,
-
-          maximumAge:
-            0
-        }
-
-      );
-
-  };
-
-
-
-// ----------------------------------------------------
-// BUILD ROUTE FROM IDS
-// ----------------------------------------------------
-
-el("buildRouteBtn")
-  .onclick = () => {
-
-    const text =
-      el("routeInput")
-        .value
-        .trim();
-
-
-    if (!text) {
-
-      alert(
-        "Enter at least one customer ID."
-      );
-
-      return;
-
-    }
-
-
-    const lines =
-      text
-        .split("\n")
-        .map(
-          x => x.trim()
-        )
-        .filter(Boolean);
-
-
-    const added = [];
-
-    const missing = [];
-
-    const already = [];
-
-
-    lines.forEach(line => {
-
-      const parts =
-        line
-          .split(/[\s,;]+/)
-          .filter(Boolean);
-
-
-      const id =
-        String(
-          parts[0] || ""
-        ).trim();
-
-
-      const quantity =
-        String(
-          parts[1] || ""
-        ).trim();
-
-
-      if (!id) return;
-
-
-      const customer =
-        state.customers.find(
-          c =>
-            String(c.id)
-              .trim()
-              .toLowerCase() ===
-            id.toLowerCase()
+        return alert(
+          "GPS is not available."
         );
-
-
-      if (!customer) {
-
-        missing.push(id);
-
-        return;
 
       }
 
 
-      let today =
-        todayItemByKey(
-          customer.key
+      el("saveGpsBtn")
+        .textContent =
+          "Getting GPS…";
+
+
+      navigator.geolocation
+        .getCurrentPosition(
+
+          pos => {
+
+            el("lat")
+              .value =
+                pos.coords
+                  .latitude
+                  .toFixed(6);
+
+
+            el("lng")
+              .value =
+                pos.coords
+                  .longitude
+                  .toFixed(6);
+
+
+            el("locationStatus")
+              .dataset.source =
+                "verified";
+
+
+            el("locationStatus")
+              .textContent =
+                `🟢 Verified truck position • GPS ±${Math.round(pos.coords.accuracy || 0)} m`;
+
+
+            el("saveGpsBtn")
+              .textContent =
+                "📍 GPS saved";
+
+          },
+
+
+          error => {
+
+            alert(
+              "Could not get GPS: " +
+              error.message
+            );
+
+
+            el("saveGpsBtn")
+              .textContent =
+                "📍 Use my current location";
+
+          },
+
+
+          {
+            enableHighAccuracy:
+              true,
+
+            timeout:
+              15000,
+
+            maximumAge:
+              0
+          }
+
         );
 
-
-      if (today) {
-
-        already.push(id);
-
-      } else {
-
-        today = {
-
-          customerKey:
-            customer.key,
-
-          quantity,
-
-          done:
-            false,
-
-          order:
-            state.today.length
-
-        };
+    };
 
 
-        state.today.push(
-          today
+
+// ---------------------------------------------------
+// TOMORROW / DELIVERY DETAILS
+// ---------------------------------------------------
+
+function openDeliveryDialog(
+  customerKey
+) {
+
+  const c =
+    customerByKey(
+      customerKey
+    );
+
+
+  const t =
+    todayItemByKey(
+      customerKey
+    );
+
+
+  if (
+    !c ||
+    !t
+  ) {
+
+    return;
+
+  }
+
+
+  editingDeliveryKey =
+    customerKey;
+
+
+  deliveryForm.reset();
+
+
+  el("deliveryDialogTitle")
+    .textContent =
+      displayName(c);
+
+
+  el("deliveryQuantity")
+    .value =
+      t.quantity ?? "";
+
+
+  el("timeRule")
+    .value =
+      t.timeRule || "none";
+
+
+  el("timeStart")
+    .value =
+      t.timeStart || "";
+
+
+  el("timeEnd")
+    .value =
+      t.timeEnd || "";
+
+
+  el("callBeforeMin")
+    .value =
+      t.callBeforeMin || 0;
+
+
+  el("deliveryNote")
+    .value =
+      t.deliveryNote || "";
+
+
+  updateTimeRuleFields();
+
+
+  deliveryDialog.showModal();
+
+}
+
+
+function updateTimeRuleFields() {
+
+  const rule =
+    el("timeRule").value;
+
+
+  el("timeStartWrap")
+    .style.display =
+      (
+        rule === "window" ||
+        rule === "after"
+      )
+        ? "flex"
+        : "none";
+
+
+  el("timeEndWrap")
+    .style.display =
+      (
+        rule === "window" ||
+        rule === "before"
+      )
+        ? "flex"
+        : "none";
+
+}
+
+
+el("timeRule")
+  .onchange =
+    updateTimeRuleFields;
+
+
+
+deliveryForm.addEventListener(
+  "submit",
+  e => {
+
+    e.preventDefault();
+
+
+    const t =
+      todayItemByKey(
+        editingDeliveryKey
+      );
+
+
+    if (!t) {
+
+      return;
+
+    }
+
+
+    t.quantity =
+      el("deliveryQuantity")
+        .value
+        .trim();
+
+
+    t.timeRule =
+      el("timeRule")
+        .value;
+
+
+    t.timeStart =
+      el("timeStart")
+        .value;
+
+
+    t.timeEnd =
+      el("timeEnd")
+        .value;
+
+
+    t.callBeforeMin =
+      Math.max(
+        0,
+        Number(
+          el("callBeforeMin")
+            .value || 0
+        )
+      );
+
+
+    t.deliveryNote =
+      el("deliveryNote")
+        .value
+        .trim();
+
+
+    /*
+      Schedule changed:
+      old ETA is no longer trustworthy.
+    */
+
+    t.eta =
+      null;
+
+
+    deliveryDialog.close();
+
+
+    saveState();
+
+  }
+);
+
+
+
+// ---------------------------------------------------
+// BUILD TODAY FROM CUSTOMER IDS
+// ---------------------------------------------------
+
+el("buildRouteBtn")
+  .onclick =
+    () => {
+
+      const text =
+        el("routeInput")
+          .value
+          .trim();
+
+
+      if (!text) {
+
+        return alert(
+          "Enter at least one customer ID."
         );
 
+      }
 
-        added.push(id);
+
+      const lines =
+        text
+          .split("\n")
+          .map(
+            x =>
+              x.trim()
+          )
+          .filter(Boolean);
+
+
+      const added =
+        [];
+
+      const missing =
+        [];
+
+      const already =
+        [];
+
+
+      lines.forEach(
+        line => {
+
+          const parts =
+            line
+              .split(
+                /[\s,;]+/
+              )
+              .filter(Boolean);
+
+
+          const id =
+            String(
+              parts[0] ||
+              ""
+            ).trim();
+
+
+          const quantity =
+            String(
+              parts[1] ||
+              ""
+            ).trim();
+
+
+          if (!id) {
+
+            return;
+
+          }
+
+
+          const c =
+            state.customers
+              .find(
+                x =>
+                  String(x.id)
+                    .trim()
+                    .toLowerCase() ===
+                  id.toLowerCase()
+              );
+
+
+          if (!c) {
+
+            missing.push(
+              id
+            );
+
+            return;
+
+          }
+
+
+          let t =
+            todayItemByKey(
+              c.key
+            );
+
+
+          if (t) {
+
+            already.push(
+              id
+            );
+
+          }
+
+          else {
+
+            t = {
+
+              customerKey:
+                c.key,
+
+              quantity:
+                quantity,
+
+              done:
+                false,
+
+              order:
+                state.today.length,
+
+              timeRule:
+                "none",
+
+              timeStart:
+                "",
+
+              timeEnd:
+                "",
+
+              callBeforeMin:
+                0,
+
+              deliveryNote:
+                "",
+
+              eta:
+                null
+
+            };
+
+
+            state.today.push(
+              t
+            );
+
+
+            added.push(
+              id
+            );
+
+          }
+
+
+          if (
+            quantity !== ""
+          ) {
+
+            t.quantity =
+              quantity;
+
+          }
+
+        }
+      );
+
+
+      saveState();
+
+
+      let msg =
+        `${added.length} customers added.`;
+
+
+      if (
+        already.length
+      ) {
+
+        msg +=
+          ` ${already.length} already in route.`;
 
       }
 
 
       if (
-        quantity !== ""
+        missing.length
       ) {
 
-        today.quantity =
-          quantity;
+        msg +=
+          ` ⚠️ Unknown IDs: ${missing.join(", ")}`;
 
       }
 
-    });
 
+      el("routeBuildResult")
+        .textContent =
+          msg;
 
-    saveState();
-
-
-    let message =
-      `${added.length} customers added.`;
-
-
-    if (
-      already.length
-    ) {
-
-      message +=
-        ` ${already.length} already in route.`;
-
-    }
-
-
-    if (
-      missing.length
-    ) {
-
-      message +=
-        ` ⚠️ Unknown IDs: ${missing.join(", ")}`;
-
-    }
-
-
-    el("routeBuildResult")
-      .textContent =
-        message;
-
-  };
+    };
 
 
 
-// ----------------------------------------------------
-// OPENROUTESERVICE API KEY
-// ----------------------------------------------------
+// ---------------------------------------------------
+// API KEY
+// ---------------------------------------------------
 
 function loadApiKey() {
 
@@ -1716,61 +2279,290 @@ function loadApiKey() {
 }
 
 
-
 el("saveApiKeyBtn")
-  .onclick = () => {
+  .onclick =
+    () => {
 
-    const key =
-      el("apiKeyInput")
-        .value
-        .trim();
+      const key =
+        el("apiKeyInput")
+          .value
+          .trim();
 
 
-    if (!key) {
+      if (!key) {
 
-      alert(
-        "Paste your API key first."
+        return alert(
+          "Paste your API key first."
+        );
+
+      }
+
+
+      localStorage.setItem(
+        API_KEY_STORAGE,
+        key
       );
 
-      return;
 
-    }
+      el("apiKeyStatus")
+        .textContent =
+          "✓ API key saved on this device.";
 
-
-    localStorage.setItem(
-      API_KEY_STORAGE,
-      key
-    );
-
-
-    el("apiKeyStatus")
-      .textContent =
-        "✓ API key saved on this device.";
-
-};
-
+    };
 
 
 el("showApiKeyBtn")
-  .onclick = () => {
+  .onclick =
+    () => {
 
-    const input =
-      el("apiKeyInput");
-
-
-    input.type =
-      input.type ===
-      "password"
-        ? "text"
-        : "password";
-
-};
+      const input =
+        el("apiKeyInput");
 
 
+      input.type =
+        input.type ===
+        "password"
+          ? "text"
+          : "password";
 
-// ----------------------------------------------------
-// REAL ROAD OPTIMIZATION
-// ----------------------------------------------------
+    };
+
+
+
+// ---------------------------------------------------
+// TIME WINDOWS
+// ---------------------------------------------------
+
+function windowsFromCustomer(c) {
+
+  const out =
+    [];
+
+
+  if (
+    c.open1Start &&
+    c.open1End
+  ) {
+
+    const a =
+      todayAt(
+        c.open1Start
+      );
+
+
+    const b =
+      todayAt(
+        c.open1End
+      );
+
+
+    if (
+      a !== null &&
+      b !== null &&
+      b >= a
+    ) {
+
+      out.push(
+        [a, b]
+      );
+
+    }
+
+  }
+
+
+  if (
+    c.open2Start &&
+    c.open2End
+  ) {
+
+    const a =
+      todayAt(
+        c.open2Start
+      );
+
+
+    const b =
+      todayAt(
+        c.open2End
+      );
+
+
+    if (
+      a !== null &&
+      b !== null &&
+      b >= a
+    ) {
+
+      out.push(
+        [a, b]
+      );
+
+    }
+
+  }
+
+
+  return out;
+
+}
+
+
+
+function windowsFromDelivery(t) {
+
+  const dayStart =
+    startOfToday();
+
+
+  const dayEnd =
+    endOfToday();
+
+
+  if (
+    t.timeRule === "window" &&
+    t.timeStart &&
+    t.timeEnd
+  ) {
+
+    const a =
+      todayAt(
+        t.timeStart
+      );
+
+
+    const b =
+      todayAt(
+        t.timeEnd
+      );
+
+
+    return (
+      a !== null &&
+      b !== null &&
+      b >= a
+    )
+      ? [[a, b]]
+      : [];
+
+  }
+
+
+  if (
+    t.timeRule === "after" &&
+    t.timeStart
+  ) {
+
+    const a =
+      todayAt(
+        t.timeStart
+      );
+
+
+    return (
+      a !== null
+    )
+      ? [[a, dayEnd]]
+      : [];
+
+  }
+
+
+  if (
+    t.timeRule === "before" &&
+    t.timeEnd
+  ) {
+
+    const b =
+      todayAt(
+        t.timeEnd
+      );
+
+
+    return (
+      b !== null
+    )
+      ? [[dayStart, b]]
+      : [];
+
+  }
+
+
+  return [];
+
+}
+
+
+
+function intersectWindows(
+  a,
+  b
+) {
+
+  if (!a.length) {
+
+    return b;
+
+  }
+
+
+  if (!b.length) {
+
+    return a;
+
+  }
+
+
+  const out =
+    [];
+
+
+  for (
+    const x of a
+  ) {
+
+    for (
+      const y of b
+    ) {
+
+      const start =
+        Math.max(
+          x[0],
+          y[0]
+        );
+
+
+      const end =
+        Math.min(
+          x[1],
+          y[1]
+        );
+
+
+      if (
+        start <= end
+      ) {
+
+        out.push(
+          [start, end]
+        );
+
+      }
+
+    }
+
+  }
+
+
+  return out;
+
+}
+
+
+
+// ---------------------------------------------------
+// REAL ROUTE OPTIMIZATION + ETA
+// ---------------------------------------------------
 
 async function optimizeRealRoute() {
 
@@ -1782,21 +2574,21 @@ async function optimizeRealRoute() {
 
   if (!key) {
 
-    alert(
+    return alert(
       "Save your openrouteservice API key first."
     );
-
-    return;
 
   }
 
 
   const pending =
     [...state.today]
+
       .sort(
         (a, b) =>
           a.order - b.order
       )
+
       .filter(
         x => !x.done
       );
@@ -1806,30 +2598,21 @@ async function optimizeRealRoute() {
     pending.length < 2
   ) {
 
-    alert(
+    return alert(
       "You need at least 2 remaining stops."
     );
-
-    return;
 
   }
 
 
   const missingGps =
     pending.filter(
-      item => {
-
-        const customer =
+      t =>
+        !coordsValid(
           customerByKey(
-            item.customerKey
-          );
-
-
-        return !coordsValid(
-          customer
-        );
-
-      }
+            t.customerKey
+          )
+        )
     );
 
 
@@ -1837,24 +2620,21 @@ async function optimizeRealRoute() {
     missingGps.length
   ) {
 
-    const ids =
+    return alert(
+
+      "These customers have no GPS location:\n\n" +
+
       missingGps
         .map(
-          item =>
+          t =>
             customerByKey(
-              item.customerKey
+              t.customerKey
             )?.id
         )
-        .filter(Boolean);
+        .filter(Boolean)
+        .join(", ")
 
-
-    alert(
-      "These customers have no GPS location:\n\n" +
-      ids.join(", ")
     );
-
-
-    return;
 
   }
 
@@ -1863,11 +2643,9 @@ async function optimizeRealRoute() {
     !navigator.geolocation
   ) {
 
-    alert(
+    return alert(
       "Current GPS is not available."
     );
-
-    return;
 
   }
 
@@ -1876,7 +2654,9 @@ async function optimizeRealRoute() {
     el("optimizeBtn");
 
 
-  button.disabled = true;
+  button.disabled =
+    true;
+
 
   button.textContent =
     "Getting truck GPS…";
@@ -1891,7 +2671,10 @@ async function optimizeRealRoute() {
 
     const position =
       await new Promise(
-        (resolve, reject) => {
+        (
+          resolve,
+          reject
+        ) =>
 
           navigator.geolocation
             .getCurrentPosition(
@@ -1911,9 +2694,15 @@ async function optimizeRealRoute() {
                   0
               }
 
-            );
+            )
 
-        }
+      );
+
+
+    const nowSec =
+      Math.floor(
+        Date.now() /
+        1000
       );
 
 
@@ -1934,70 +2723,176 @@ async function optimizeRealRoute() {
 
     el("optimizerStatus")
       .textContent =
-        "Calculating best road order…";
+        "Calculating road order, time windows and ETA…";
 
 
-    const jobToCustomer =
+    const jobToKey =
       new Map();
 
 
     const jobs =
-      pending.map(
-        (item, index) => {
-
-          const customer =
-            customerByKey(
-              item.customerKey
-            );
+      [];
 
 
-          const jobId =
-            index + 1;
+    /*
+      This zero-service job anchors the schedule
+      to NOW at the truck's current location.
+
+      It prevents the optimizer from pretending
+      that you started the route later.
+    */
+
+    const ANCHOR_ID =
+      900000000;
 
 
-          jobToCustomer.set(
-            jobId,
+    jobs.push({
+
+      id:
+        ANCHOR_ID,
+
+      location:
+        start,
+
+      time_windows:
+        [
+          [
+            nowSec,
+            nowSec
+          ]
+        ],
+
+      service:
+        0,
+
+      description:
+        "START NOW"
+
+    });
+
+
+
+    pending.forEach(
+      (
+        item,
+        index
+      ) => {
+
+        const c =
+          customerByKey(
             item.customerKey
           );
 
 
-          return {
+        const jobId =
+          index + 1;
 
-            id:
-              jobId,
 
-            location: [
+        jobToKey.set(
+          jobId,
+          item.customerKey
+        );
 
-              Number(
-                customer.lng
-              ),
 
-              Number(
-                customer.lat
+        const job = {
+
+          id:
+            jobId,
+
+          description:
+            displayName(c),
+
+          location: [
+
+            Number(
+              c.lng
+            ),
+
+            Number(
+              c.lat
+            )
+
+          ],
+
+          service:
+            Math.max(
+              0,
+              Math.round(
+                Number(
+                  c.serviceMin ||
+                  7
+                ) * 60
               )
+            )
 
-            ],
+        };
 
-            service:
-              Math.max(
-                0,
-                Math.round(
-                  Number(
-                    customer.serviceMin ||
-                    7
-                  ) * 60
-                )
-              )
 
-          };
+        const shopWindows =
+          windowsFromCustomer(c);
+
+
+        const deliveryWindows =
+          windowsFromDelivery(
+            item
+          );
+
+
+        const windows =
+          intersectWindows(
+            shopWindows,
+            deliveryWindows
+          );
+
+
+        /*
+          Customer has opening hours AND
+          tomorrow has a special time rule,
+          but they don't overlap.
+        */
+
+        if (
+          (
+            shopWindows.length ||
+            deliveryWindows.length
+          ) &&
+          !windows.length
+        ) {
+
+          throw new Error(
+
+            "No valid overlap between opening hours and delivery time for customer " +
+            c.id +
+            "."
+
+          );
 
         }
-      );
+
+
+        if (
+          windows.length
+        ) {
+
+          job.time_windows =
+            windows;
+
+        }
+
+
+        jobs.push(
+          job
+        );
+
+      }
+    );
 
 
     const requestBody = {
 
-      jobs,
+      jobs:
+
+        jobs,
 
       vehicles: [
 
@@ -2010,7 +2905,15 @@ async function optimizeRealRoute() {
             "driving-car",
 
           start:
-            start
+            start,
+
+          time_window: [
+
+            nowSec,
+
+            endOfToday()
+
+          ]
 
         }
 
@@ -2021,7 +2924,9 @@ async function optimizeRealRoute() {
 
     const response =
       await fetch(
+
         ORS_OPTIMIZATION_URL,
+
         {
 
           method:
@@ -2029,13 +2934,13 @@ async function optimizeRealRoute() {
 
           headers: {
 
-            "Authorization":
+            Authorization:
               key,
 
             "Content-Type":
               "application/json",
 
-            "Accept":
+            Accept:
               "application/json"
 
           },
@@ -2046,6 +2951,7 @@ async function optimizeRealRoute() {
             )
 
         }
+
       );
 
 
@@ -2053,25 +2959,27 @@ async function optimizeRealRoute() {
       await response.json();
 
 
-    if (!response.ok) {
-
-      console.error(
-        result
-      );
-
+    if (
+      !response.ok ||
+      (
+        result.code &&
+        result.code !== 0
+      )
+    ) {
 
       throw new Error(
+
         result?.error ||
         result?.message ||
         `API error ${response.status}`
+
       );
 
     }
 
 
     if (
-      !result.routes ||
-      !result.routes.length
+      !result.routes?.length
     ) {
 
       throw new Error(
@@ -2081,23 +2989,87 @@ async function optimizeRealRoute() {
     }
 
 
+    /*
+      Time windows can make a delivery impossible.
+      If so, VROOM may report it as unassigned.
+    */
+
+    if (
+      result.unassigned?.length
+    ) {
+
+      const failed =
+        result.unassigned
+
+          .filter(
+            x =>
+              x.id !==
+              ANCHOR_ID
+          )
+
+          .map(
+            x =>
+              customerByKey(
+                jobToKey.get(x.id)
+              )?.id ||
+              x.id
+          );
+
+
+      if (
+        failed.length
+      ) {
+
+        throw new Error(
+
+          "These deliveries cannot fit the current time rules: " +
+          failed.join(", ")
+
+        );
+
+      }
+
+    }
+
+
     const route =
       result.routes[0];
+
+
+    const stepByJob =
+      new Map();
+
+
+    route.steps
+
+      .filter(
+        s =>
+          s.type === "job" &&
+          s.id !== ANCHOR_ID
+      )
+
+      .forEach(
+        s =>
+          stepByJob.set(
+            s.id,
+            s
+          )
+      );
 
 
     const orderedKeys =
       route.steps
 
         .filter(
-          step =>
-            step.type ===
-            "job"
+          s =>
+            s.type === "job" &&
+            s.id !== ANCHOR_ID
         )
 
         .map(
-          step =>
-            jobToCustomer.get(
-              step.job
+          s =>
+            jobToKey.get(
+              s.id
             )
         )
 
@@ -2133,15 +3105,46 @@ async function optimizeRealRoute() {
       orderedKeys.map(
         key =>
           state.today.find(
-            item =>
-              item.customerKey ===
+            x =>
+              x.customerKey ===
               key &&
-              !item.done
+              !x.done
           )
       );
 
 
-    const newOrder = [
+    /*
+      Save ETA returned by VROOM
+      into each delivery.
+    */
+
+    optimized.forEach(
+      item => {
+
+        const jobId =
+          [...jobToKey.entries()]
+            .find(
+              ([, key]) =>
+                key ===
+                item.customerKey
+            )?.[0];
+
+
+        const step =
+          stepByJob.get(
+            jobId
+          );
+
+
+        item.eta =
+          step?.arrival ??
+          null;
+
+      }
+    );
+
+
+    state.today = [
 
       ...done,
 
@@ -2150,32 +3153,18 @@ async function optimizeRealRoute() {
     ];
 
 
-    newOrder.forEach(
-      (item, index) =>
-        item.order =
-          index
+    state.today.forEach(
+      (x, i) =>
+        x.order = i
     );
-
-
-    state.today =
-      newOrder;
 
 
     saveState();
 
 
-    const km =
-      Number(
-        route.distance || 0
-      ) / 1000;
-
-
-    const minutes =
-      Math.round(
-        Number(
-          route.duration || 0
-        ) / 60
-      );
+    const finalEta =
+      optimized.at(-1)
+        ?.eta;
 
 
     const accuracy =
@@ -2187,10 +3176,26 @@ async function optimizeRealRoute() {
 
     el("optimizerStatus")
       .textContent =
-        `✓ Optimized from current truck position • ${km.toFixed(1)} km • about ${minutes} min including service time • GPS ±${accuracy} m`;
+
+        "✓ Optimized " +
+        pending.length +
+        " stops" +
+
+        (
+          finalEta
+            ? " • last ETA ~" +
+              hhmmFromEpoch(finalEta)
+            : ""
+        ) +
+
+        " • GPS ±" +
+        accuracy +
+        " m";
 
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     console.error(
       error
@@ -2204,14 +3209,19 @@ async function optimizeRealRoute() {
 
 
     alert(
+
       "Optimization failed:\n\n" +
       error.message
+
     );
 
+  }
 
-  } finally {
+  finally {
 
-    button.disabled = false;
+    button.disabled =
+      false;
+
 
     button.textContent =
       "🚚 Optimize route";
@@ -2228,9 +3238,9 @@ el("optimizeBtn")
 
 
 
-// ----------------------------------------------------
-// OTHER BUTTONS
-// ----------------------------------------------------
+// ---------------------------------------------------
+// MAIN BUTTONS
+// ---------------------------------------------------
 
 el("findLocationBtn")
   .onclick =
@@ -2253,123 +3263,130 @@ el("searchInput")
     renderCustomers;
 
 
+
 el("completeCurrentBtn")
-  .onclick = () => {
+  .onclick =
+    () => {
 
-    const current =
-      currentUndone();
+      const cur =
+        currentUndone();
 
 
-    if (!current) {
+      if (!cur) {
 
-      alert(
-        "No remaining stop."
+        return alert(
+          "No remaining stop."
+        );
+
+      }
+
+
+      markDone(
+        cur.customerKey
       );
 
-      return;
+    };
 
-    }
-
-
-    markDone(
-      current.customerKey
-    );
-
-  };
 
 
 el("resetTodayBtn")
-  .onclick = () => {
+  .onclick =
+    () => {
 
-    if (
-      !confirm(
-        "Clear today's route? Customer database will stay untouched."
-      )
-    ) {
+      if (
+        !confirm(
+          "Clear today's route? Customer database will stay untouched."
+        )
+      ) {
 
-      return;
+        return;
 
-    }
-
-
-    state.today = [];
+      }
 
 
-    saveState();
+      state.today =
+        [];
 
 
-    el("optimizerStatus")
-      .textContent =
-        "Route not optimized yet.";
-
-  };
+      saveState();
 
 
+      el("optimizerStatus")
+        .textContent =
+          "Route not optimized yet.";
 
-// ----------------------------------------------------
+    };
+
+
+
+// ---------------------------------------------------
 // BACKUP
-// ----------------------------------------------------
+// ---------------------------------------------------
 
 el("exportBtn")
-  .onclick = () => {
+  .onclick =
+    () => {
 
-    const blob =
-      new Blob(
-        [
-          JSON.stringify(
-            state,
-            null,
-            2
-          )
-        ],
-        {
-          type:
-            "application/json"
-        }
+      const blob =
+        new Blob(
+
+          [
+            JSON.stringify(
+              state,
+              null,
+              2
+            )
+          ],
+
+          {
+            type:
+              "application/json"
+          }
+
+        );
+
+
+      const a =
+        document.createElement(
+          "a"
+        );
+
+
+      a.href =
+        URL.createObjectURL(
+          blob
+        );
+
+
+      a.download =
+        `delivery-helper-backup-${new Date().toISOString().slice(0,10)}.json`;
+
+
+      a.click();
+
+
+      URL.revokeObjectURL(
+        a.href
       );
 
-
-    const a =
-      document.createElement(
-        "a"
-      );
-
-
-    a.href =
-      URL.createObjectURL(
-        blob
-      );
-
-
-    a.download =
-      "delivery-helper-backup-" +
-      new Date()
-        .toISOString()
-        .slice(0, 10) +
-      ".json";
-
-
-    a.click();
-
-
-    URL.revokeObjectURL(
-      a.href
-    );
-
-  };
+    };
 
 
 
 el("importInput")
   .onchange =
-    async event => {
+    async e => {
 
       const file =
-        event.target
+        e.target
           .files?.[0];
 
 
-      if (!file) return;
+      if (!file) {
+
+        return;
+
+      }
 
 
       try {
@@ -2398,8 +3415,9 @@ el("importInput")
 
         saveState();
 
+      }
 
-      } catch (error) {
+      catch (error) {
 
         alert(
           "Import failed: " +
@@ -2409,31 +3427,33 @@ el("importInput")
       }
 
 
-      event.target
-        .value = "";
+      e.target.value =
+        "";
 
     };
 
 
 
-// ----------------------------------------------------
-// INSTALL / SERVICE WORKER
-// ----------------------------------------------------
+// ---------------------------------------------------
+// INSTALL / PWA
+// ---------------------------------------------------
 
 window.addEventListener(
   "beforeinstallprompt",
-  event => {
+  e => {
 
-    event.preventDefault();
+    e.preventDefault();
 
 
     deferredPrompt =
-      event;
+      e;
 
 
     el("installBtn")
       .classList
-      .remove("hidden");
+      .remove(
+        "hidden"
+      );
 
   }
 );
@@ -2466,7 +3486,9 @@ el("installBtn")
 
       el("installBtn")
         .classList
-        .add("hidden");
+        .add(
+          "hidden"
+        );
 
     };
 
@@ -2479,7 +3501,9 @@ if (
 
   navigator
     .serviceWorker
-    .register("./sw.js")
+    .register(
+      "./sw.js"
+    )
     .catch(
       console.error
     );
@@ -2488,9 +3512,9 @@ if (
 
 
 
-// ----------------------------------------------------
+// ---------------------------------------------------
 // START
-// ----------------------------------------------------
+// ---------------------------------------------------
 
 loadApiKey();
 
