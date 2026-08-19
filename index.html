@@ -13,472 +13,477 @@
 
 <body>
 
-  <header class="topbar">
-    <div>
-      <h1>Delivery Helper</h1>
-      <div id="routeSummary" class="subtle">
-        0 stops today
+<header class="topbar">
+  <div>
+    <h1>Delivery Helper</h1>
+    <div id="routeSummary" class="subtle">0 stops today</div>
+  </div>
+
+  <button id="installBtn" class="ghost hidden">Install</button>
+</header>
+
+
+<main>
+
+  <!-- NEXT STOPS -->
+
+  <section class="panel">
+
+    <div class="section-head">
+
+      <h2>Next stops</h2>
+
+      <div class="actions">
+
+        <button id="optimizeBtn" class="primary">
+          🚚 Optimize route
+        </button>
+
+        <button id="resetTodayBtn" class="ghost">
+          Reset today
+        </button>
+
       </div>
+
     </div>
 
-    <button id="installBtn" class="ghost hidden">
-      Install
-    </button>
-  </header>
+
+    <div id="optimizerStatus" class="subtle" style="margin-bottom:10px">
+      Route not optimized yet.
+    </div>
 
 
-  <main>
+    <div id="carousel" class="carousel"></div>
 
-    <!-- NEXT STOPS -->
 
-    <section class="panel">
+    <div id="emptyRoute" class="empty">
+      No stops selected for today yet.
+    </div>
 
-      <div class="section-head">
+  </section>
 
-        <h2>Next stops</h2>
 
-        <div class="actions">
 
-          <button id="optimizeBtn" class="secondary">
-            Optimize
-          </button>
+  <!-- BUILD ROUTE -->
 
-          <button id="resetTodayBtn" class="ghost">
-            Reset today
-          </button>
+  <section class="panel">
 
-        </div>
+    <div class="section-head">
+      <h2>Build today's route</h2>
+    </div>
 
-      </div>
+    <p class="subtle">
+      One customer per line. Example: 18452 10
+    </p>
 
-      <div id="carousel" class="carousel"></div>
+    <textarea
+      id="routeInput"
+      rows="7"
+      placeholder="18452 10&#10;22107 6&#10;19631 15"
+    ></textarea>
 
-      <div id="emptyRoute" class="empty">
+    <div class="actions" style="margin-top:10px">
 
-        No stops selected for today yet.
-        Open <b>Customers</b> and add some to today's route.
+      <button
+        id="buildRouteBtn"
+        class="primary"
+      >
+        Build today's route
+      </button>
 
-      </div>
+    </div>
 
-    </section>
+    <div
+      id="routeBuildResult"
+      class="subtle"
+      style="margin-top:10px"
+    ></div>
 
-<!-- BUILD TODAY'S ROUTE -->
+  </section>
 
-<section class="panel">
 
-  <div class="section-head">
-    <h2>Build today's route</h2>
-  </div>
 
-  <p class="subtle">
-    Enter one customer per line. Example: 18452 10
-  </p>
+  <!-- TODAY -->
 
-  <textarea
-    id="routeInput"
-    rows="7"
-    placeholder="18452 10&#10;22107 6&#10;19631 15"
-  ></textarea>
+  <section class="panel">
 
-  <div class="actions" style="margin-top:10px">
+    <div class="section-head">
 
-    <button
-      id="buildRouteBtn"
-      class="primary"
+      <h2>Today</h2>
+
+      <button id="completeCurrentBtn" class="primary">
+        ✓ Delivered current
+      </button>
+
+    </div>
+
+    <div id="todayList" class="today-list"></div>
+
+  </section>
+
+
+
+  <!-- CUSTOMERS -->
+
+  <section class="panel">
+
+    <div class="section-head">
+
+      <h2>Customers</h2>
+
+      <button id="newCustomerBtn" class="primary">
+        + New customer
+      </button>
+
+    </div>
+
+    <input
+      id="searchInput"
+      class="search"
+      placeholder="Search by ID, name, phone or area"
+    />
+
+    <div id="customerList" class="customer-list"></div>
+
+  </section>
+
+
+
+  <!-- ROUTING SETTINGS -->
+
+  <section class="panel">
+
+    <h2>Routing settings</h2>
+
+    <p class="subtle">
+      Your HeiGIT / openrouteservice key stays only on this device.
+    </p>
+
+    <label>
+      API key
+
+      <input
+        id="apiKeyInput"
+        type="password"
+        placeholder="Paste your API key here"
+        autocomplete="off"
+      />
+
+    </label>
+
+    <div class="actions">
+
+      <button
+        id="saveApiKeyBtn"
+        class="primary"
+      >
+        Save API key
+      </button>
+
+      <button
+        id="showApiKeyBtn"
+        class="ghost"
+      >
+        Show / hide
+      </button>
+
+    </div>
+
+    <div
+      id="apiKeyStatus"
+      class="subtle"
+      style="margin-top:10px"
+    ></div>
+
+  </section>
+
+
+
+  <!-- BACKUP -->
+
+  <section class="panel">
+
+    <h2>Backup</h2>
+
+    <div class="backup-actions">
+
+      <button id="exportBtn" class="secondary">
+        Export data
+      </button>
+
+      <label class="secondary file-label">
+        Import data
+
+        <input
+          id="importInput"
+          type="file"
+          accept=".json,application/json"
+          hidden
+        />
+      </label>
+
+    </div>
+
+    <p class="subtle">
+      Customer data is stored on this device.
+      Export a backup occasionally.
+    </p>
+
+  </section>
+
+</main>
+
+
+
+<!-- CUSTOMER WINDOW -->
+
+<dialog id="customerDialog">
+
+  <form method="dialog" id="customerForm">
+
+    <div class="dialog-head">
+
+      <h2 id="dialogTitle">
+        Customer
+      </h2>
+
+      <button value="cancel" class="ghost">
+        ✕
+      </button>
+
+    </div>
+
+
+    <input type="hidden" id="editKey" />
+
+
+    <label>
+      Customer ID
+
+      <input
+        id="customerId"
+        required
+      />
+    </label>
+
+
+    <label>
+      Name / description
+
+      <input
+        id="customerName"
+        placeholder="Optional"
+      />
+    </label>
+
+
+    <label>
+      Address / area
+
+      <input
+        id="customerAddress"
+        placeholder="Village, street, landmark..."
+      />
+    </label>
+
+
+    <div class="actions" style="margin:-2px 0 12px">
+
+      <button
+        type="button"
+        id="findLocationBtn"
+        class="secondary"
+      >
+        🔎 Find location
+      </button>
+
+      <button
+        type="button"
+        id="checkMapBtn"
+        class="ghost"
+      >
+        🗺 Check map
+      </button>
+
+    </div>
+
+
+    <div
+      id="locationStatus"
+      class="subtle"
+      style="margin:-4px 0 12px"
     >
-      Build today's route
-    </button>
-
-  </div>
-
-  <div
-    id="routeBuildResult"
-    class="subtle"
-    style="margin-top:10px"
-  ></div>
-
-</section>
-
-    <!-- TODAY -->
-
-    <section class="panel">
-
-      <div class="section-head">
-
-        <h2>Today</h2>
-
-        <button id="completeCurrentBtn" class="primary">
-          ✓ Delivered current
-        </button>
-
-      </div>
-
-      <div id="todayList" class="today-list"></div>
-
-    </section>
+      No location checked yet.
+    </div>
 
 
-
-    <!-- CUSTOMERS -->
-
-    <section class="panel">
-
-      <div class="section-head">
-
-        <h2>Customers</h2>
-
-        <button id="newCustomerBtn" class="primary">
-          + New customer
-        </button>
-
-      </div>
-
-      <input
-        id="searchInput"
-        class="search"
-        placeholder="Search by ID, name, phone or area"
-      />
-
-      <div id="customerList" class="customer-list"></div>
-
-    </section>
-
-
-
-    <!-- BACKUP -->
-
-    <section class="panel">
-
-      <h2>Backup</h2>
-
-      <div class="backup-actions">
-
-        <button id="exportBtn" class="secondary">
-          Export data
-        </button>
-
-        <label class="secondary file-label">
-
-          Import data
-
-          <input
-            id="importInput"
-            type="file"
-            accept=".json,application/json"
-            hidden
-          />
-
-        </label>
-
-      </div>
-
-      <p class="subtle">
-        Data is stored on this device.
-        Export a backup occasionally.
-      </p>
-
-    </section>
-
-  </main>
-
-
-
-  <!-- CUSTOMER EDITOR -->
-
-  <dialog id="customerDialog">
-
-    <form method="dialog" id="customerForm">
-
-      <div class="dialog-head">
-
-        <h2 id="dialogTitle">
-          Customer
-        </h2>
-
-        <button value="cancel" class="ghost">
-          ✕
-        </button>
-
-      </div>
-
-
-      <input
-        type="hidden"
-        id="editKey"
-      />
-
-
-      <!-- CUSTOMER ID -->
+    <div class="grid2">
 
       <label>
-        Customer ID
+        Phone 1
 
         <input
-          id="customerId"
-          required
+          id="phone1"
+          inputmode="tel"
         />
-
       </label>
 
 
-      <!-- NAME -->
-
       <label>
-        Name / description
+        Phone 2
 
         <input
-          id="customerName"
-          placeholder="Optional"
+          id="phone2"
+          inputmode="tel"
         />
+      </label>
 
+    </div>
+
+
+    <div class="grid2">
+
+      <label>
+        Latitude
+
+        <input
+          id="lat"
+          inputmode="decimal"
+        />
       </label>
 
 
-      <!-- ADDRESS -->
-
       <label>
-        Address / area
+        Longitude
 
         <input
-          id="customerAddress"
-          placeholder="Village, street, landmark..."
+          id="lng"
+          inputmode="decimal"
         />
+      </label>
 
+    </div>
+
+
+    <div class="grid2">
+
+      <label>
+        Default service min
+
+        <input
+          id="serviceMin"
+          type="number"
+          min="0"
+          value="7"
+        />
       </label>
 
 
-      <!-- ADDRESS LOOKUP -->
+      <label>
+        Tomorrow quantity
 
-      <div
-        class="actions"
-        style="margin:-2px 0 12px"
+        <input
+          id="quantity"
+          type="number"
+          min="0"
+        />
+      </label>
+
+    </div>
+
+
+    <label>
+      Company notes
+
+      <textarea
+        id="companyNotes"
+        rows="2"
+      ></textarea>
+    </label>
+
+
+    <label>
+      Your notes
+
+      <textarea
+        id="myNotes"
+        rows="3"
+        placeholder="Parking, rear entrance, narrow road, call first..."
+      ></textarea>
+    </label>
+
+
+    <div class="dialog-actions">
+
+      <button
+        type="button"
+        id="saveGpsBtn"
+        class="secondary"
       >
-
-        <button
-          type="button"
-          id="findLocationBtn"
-          class="secondary"
-        >
-          🔎 Find location
-        </button>
-
-        <button
-          type="button"
-          id="checkMapBtn"
-          class="ghost"
-        >
-          🗺 Check map
-        </button>
-
-      </div>
+        📍 Use my current location
+      </button>
 
 
-      <div
-        id="locationStatus"
-        class="subtle"
-        style="margin:-4px 0 12px"
+      <button
+        type="submit"
+        class="primary"
       >
-        No location checked yet.
-      </div>
+        Save customer
+      </button>
 
+    </div>
 
-      <!-- PHONE NUMBERS -->
+  </form>
 
-      <div class="grid2">
+</dialog>
 
-        <label>
-          Phone 1
 
-          <input
-            id="phone1"
-            inputmode="tel"
-          />
 
-        </label>
+<!-- STOP CARD -->
 
+<template id="cardTemplate">
 
-        <label>
-          Phone 2
+  <article class="stop-card">
 
-          <input
-            id="phone2"
-            inputmode="tel"
-          />
+    <div class="stop-number"></div>
 
-        </label>
+    <div class="stop-main">
 
-      </div>
+      <div class="stop-title"></div>
 
+      <div class="stop-meta"></div>
 
+      <div class="stop-notes"></div>
 
-      <!-- GPS -->
+    </div>
 
-      <div class="grid2">
 
-        <label>
-          Latitude
+    <div class="card-actions">
 
-          <input
-            id="lat"
-            inputmode="decimal"
-            placeholder="37.038..."
-          />
+      <button class="call1">
+        📞 Call
+      </button>
 
-        </label>
+      <button class="call2 secondary">
+        📞 Phone 2
+      </button>
 
+      <button class="nav secondary">
+        🧭 Navigate
+      </button>
 
-        <label>
-          Longitude
+      <button class="done primary">
+        ✓ Delivered
+      </button>
 
-          <input
-            id="lng"
-            inputmode="decimal"
-            placeholder="22.114..."
-          />
+    </div>
 
-        </label>
+  </article>
 
-      </div>
+</template>
 
 
+<script src="app.js"></script>
 
-      <!-- SERVICE / QUANTITY -->
-
-      <div class="grid2">
-
-        <label>
-          Default service min
-
-          <input
-            id="serviceMin"
-            type="number"
-            min="0"
-            value="7"
-          />
-
-        </label>
-
-
-        <label>
-          Tomorrow quantity
-
-          <input
-            id="quantity"
-            type="number"
-            min="0"
-          />
-
-        </label>
-
-      </div>
-
-
-
-      <!-- COMPANY NOTES -->
-
-      <label>
-        Company notes
-
-        <textarea
-          id="companyNotes"
-          rows="2"
-        ></textarea>
-
-      </label>
-
-
-
-      <!-- DRIVER NOTES -->
-
-      <label>
-        Your notes
-
-        <textarea
-          id="myNotes"
-          rows="3"
-          placeholder="Parking, rear entrance, narrow road, call first..."
-        ></textarea>
-
-      </label>
-
-
-
-      <!-- CUSTOMER ACTIONS -->
-
-      <div class="dialog-actions">
-
-        <button
-          type="button"
-          id="saveGpsBtn"
-          class="secondary"
-        >
-          📍 Use my current location
-        </button>
-
-
-        <button
-          type="submit"
-          class="primary"
-        >
-          Save customer
-        </button>
-
-      </div>
-
-    </form>
-
-  </dialog>
-
-
-
-  <!-- NEXT STOP CARD TEMPLATE -->
-
-  <template id="cardTemplate">
-
-    <article class="stop-card">
-
-      <div class="stop-number"></div>
-
-
-      <div class="stop-main">
-
-        <div class="stop-title"></div>
-
-        <div class="stop-meta"></div>
-
-        <div class="stop-notes"></div>
-
-      </div>
-
-
-      <div class="card-actions">
-
-        <button class="call1">
-          📞 Call
-        </button>
-
-        <button class="call2 secondary">
-          📞 Phone 2
-        </button>
-
-        <button class="nav secondary">
-          🧭 Navigate
-        </button>
-
-        <button class="done primary">
-          ✓ Delivered
-        </button>
-
-      </div>
-
-    </article>
-
-  </template>
-
-
-  <script src="app.js"></script>
-
-  <!-- refresh v2 -->
-  
 </body>
 </html>
