@@ -1622,7 +1622,169 @@ el("installBtn").onclick =
 
   };
 
+// ---------------------------------------------------
+// BUILD TODAY'S ROUTE FROM CUSTOMER IDs
+// ---------------------------------------------------
 
+el("buildRouteBtn").onclick = () => {
+
+  const text =
+    el("routeInput")
+      .value
+      .trim();
+
+
+  if (!text) {
+
+    alert(
+      "Enter at least one customer ID."
+    );
+
+    return;
+  }
+
+
+  const lines =
+    text
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean);
+
+
+  const found = [];
+
+  const missing = [];
+
+  const alreadyThere = [];
+
+
+  lines.forEach(line => {
+
+    // Allows:
+    // 18452 10
+    // 18452,10
+    // 18452;10
+
+    const parts =
+      line
+        .split(/[\s,;]+/)
+        .filter(Boolean);
+
+
+    const id =
+      String(parts[0] || "")
+        .trim();
+
+
+    const quantity =
+      String(parts[1] || "")
+        .trim();
+
+
+    if (!id) {
+      return;
+    }
+
+
+    const customer =
+      state.customers.find(
+        c =>
+          String(c.id)
+            .trim()
+            .toLowerCase() ===
+          id.toLowerCase()
+      );
+
+
+    if (!customer) {
+
+      missing.push(id);
+
+      return;
+    }
+
+
+    let todayItem =
+      todayItemByKey(
+        customer.key
+      );
+
+
+    if (todayItem) {
+
+      alreadyThere.push(id);
+
+    } else {
+
+      todayItem = {
+        customerKey:
+          customer.key,
+
+        quantity:
+          quantity,
+
+        done:
+          false,
+
+        order:
+          state.today.length
+      };
+
+
+      state.today.push(
+        todayItem
+      );
+
+
+      found.push(id);
+
+    }
+
+
+    if (
+      quantity !== ""
+    ) {
+
+      todayItem.quantity =
+        quantity;
+
+    }
+
+  });
+
+
+  saveState();
+
+
+  let message =
+    `${found.length} customers added.`;
+
+
+  if (
+    alreadyThere.length
+  ) {
+
+    message +=
+      ` ${alreadyThere.length} already in route.`;
+
+  }
+
+
+  if (
+    missing.length
+  ) {
+
+    message +=
+      ` ⚠️ Unknown IDs: ${missing.join(", ")}`;
+
+  }
+
+
+  el("routeBuildResult")
+    .textContent =
+      message;
+
+};
 
 // ---------------------------------------------------
 // SERVICE WORKER
