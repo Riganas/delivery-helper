@@ -8,7 +8,7 @@ const ASSETS = [
   "./manifest.json"
 ];
 
-// Install the newest version immediately
+// Install the newest version
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE).then(cache => cache.addAll(ASSETS))
@@ -17,7 +17,7 @@ self.addEventListener("install", event => {
   self.skipWaiting();
 });
 
-// Remove older cached app versions
+// Delete old cached versions
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -30,16 +30,14 @@ self.addEventListener("activate", event => {
   );
 });
 
-// Network first.
-// If internet is unavailable, use the cached version.
+// Try internet first.
+// If internet is unavailable, use saved offline files.
 self.addEventListener("fetch", event => {
-
   if (event.request.method !== "GET") return;
 
   event.respondWith(
     fetch(event.request)
       .then(response => {
-
         const copy = response.clone();
 
         caches.open(CACHE).then(cache => {
@@ -48,8 +46,6 @@ self.addEventListener("fetch", event => {
 
         return response;
       })
-      .catch(() =>
-        caches.match(event.request)
-      )
+      .catch(() => caches.match(event.request))
   );
 });
