@@ -1,193 +1,361 @@
 const STORAGE_KEY = "delivery-helper-v1";
+const API_KEY_STORAGE = "delivery-helper-ors-key";
+
+const ORS_OPTIMIZATION_URL =
+  "https://api.heigit.org/vroom/v0";
+
 
 let state = loadState();
+
 let deferredPrompt = null;
 
-const el = id => document.getElementById(id);
-const dialog = el("customerDialog");
-const form = el("customerForm");
 
+const el =
+  id => document.getElementById(id);
+
+
+const dialog =
+  el("customerDialog");
+
+
+const form =
+  el("customerForm");
+
+
+
+// ----------------------------------------------------
+// DATA
+// ----------------------------------------------------
 
 function loadState() {
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+
+    const raw =
+      localStorage.getItem(
+        STORAGE_KEY
+      );
+
 
     if (raw) {
+
       return JSON.parse(raw);
+
     }
 
   } catch {}
 
+
   return {
+
     customers: [],
+
     today: []
+
   };
+
 }
+
 
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(state)
+  );
+
+
   render();
+
 }
 
-
-function cleanPhone(p) {
-  return String(p || "").replace(/[^\d+]/g, "");
-}
 
 
 function customerByKey(key) {
-  return state.customers.find(c => c.key === key);
+
+  return state.customers.find(
+    c => c.key === key
+  );
+
 }
+
 
 
 function todayItemByKey(key) {
-  return state.today.find(x => x.customerKey === key);
+
+  return state.today.find(
+    x => x.customerKey === key
+  );
+
 }
+
 
 
 function displayName(c) {
-  return [c.id, c.name]
+
+  return [
+    c.id,
+    c.name
+  ]
     .filter(Boolean)
     .join(" — ");
+
 }
+
 
 
 function coordsValid(c) {
+
   return (
-    Number.isFinite(Number(c.lat)) &&
-    Number.isFinite(Number(c.lng))
+    Number.isFinite(Number(c?.lat)) &&
+    Number.isFinite(Number(c?.lng))
   );
+
 }
 
 
-function distanceKm(a, b) {
-  const R = 6371;
 
-  const rad = x =>
-    x * Math.PI / 180;
+function escapeHtml(s) {
 
-  const dLat = rad(b.lat - a.lat);
-  const dLon = rad(b.lng - a.lng);
+  return String(
+    s ?? ""
+  ).replace(
+    /[&<>"']/g,
+    ch => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    }[ch])
+  );
 
-  const lat1 = rad(a.lat);
-  const lat2 = rad(b.lat);
-
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) *
-    Math.cos(lat2) *
-    Math.sin(dLon / 2) ** 2;
-
-  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+
+
+function cleanPhone(p) {
+
+  return String(
+    p || ""
+  ).replace(
+    /[^\d+]/g,
+    ""
+  );
+
+}
+
+
+
+// ----------------------------------------------------
+// PHONE + NAVIGATION
+// ----------------------------------------------------
 
 function openCall(phone) {
-  const p = cleanPhone(phone);
+
+  const p =
+    cleanPhone(phone);
+
 
   if (!p) {
-    return alert("No phone number saved.");
+
+    alert(
+      "No phone number saved."
+    );
+
+    return;
+
   }
 
-  location.href = `tel:${p}`;
+
+  location.href =
+    `tel:${p}`;
+
 }
+
 
 
 function navigate(c) {
-  let q = "";
+
+  let destination = "";
+
 
   if (coordsValid(c)) {
-    q = `${c.lat},${c.lng}`;
+
+    destination =
+      `${c.lat},${c.lng}`;
 
   } else if (c.address) {
-    q = encodeURIComponent(c.address);
+
+    destination =
+      c.address;
 
   } else {
-    return alert("No GPS coordinates or address saved.");
+
+    alert(
+      "No GPS coordinates or address saved."
+    );
+
+    return;
+
   }
+
 
   location.href =
-    `https://www.google.com/maps/dir/?api=1&destination=${q}`;
+    "https://www.google.com/maps/dir/?api=1&destination=" +
+    encodeURIComponent(destination);
+
 }
 
+
+
+// ----------------------------------------------------
+// TODAY ROUTE
+// ----------------------------------------------------
 
 function addToToday(c) {
+
   if (
-    !state.today.some(
-      x => x.customerKey === c.key
+    state.today.some(
+      x =>
+        x.customerKey === c.key
     )
   ) {
-    state.today.push({
-      customerKey: c.key,
-      quantity: "",
-      done: false,
-      order: state.today.length
-    });
 
-    saveState();
+    return;
+
   }
+
+
+  state.today.push({
+
+    customerKey:
+      c.key,
+
+    quantity:
+      "",
+
+    done:
+      false,
+
+    order:
+      state.today.length
+
+  });
+
+
+  saveState();
+
 }
+
 
 
 function removeFromToday(key) {
+
   state.today =
     state.today.filter(
-      x => x.customerKey !== key
+      x =>
+        x.customerKey !== key
     );
 
+
   state.today.forEach(
-    (x, i) => x.order = i
+    (x, i) =>
+      x.order = i
   );
 
+
   saveState();
+
 }
+
 
 
 function markDone(key) {
-  const t = todayItemByKey(key);
 
-  if (!t) return;
+  const item =
+    todayItemByKey(key);
 
-  t.done = true;
+
+  if (!item) return;
+
+
+  item.done = true;
+
 
   saveState();
+
 }
+
 
 
 function currentUndone() {
+
   return [...state.today]
+
     .sort(
-      (a, b) => a.order - b.order
+      (a, b) =>
+        a.order - b.order
     )
-    .find(x => !x.done);
+
+    .find(
+      x => !x.done
+    );
+
 }
 
+
+
+// ----------------------------------------------------
+// RENDER
+// ----------------------------------------------------
 
 function render() {
+
   renderSummary();
+
   renderCarousel();
+
   renderToday();
+
   renderCustomers();
+
 }
+
 
 
 function renderSummary() {
-  const total = state.today.length;
+
+  const total =
+    state.today.length;
+
 
   const done =
     state.today.filter(
       x => x.done
     ).length;
 
-  el("routeSummary").textContent =
-    `${total} stops today • ${done} delivered • ${Math.max(total - done, 0)} remaining`;
+
+  el("routeSummary")
+    .textContent =
+      `${total} stops today • ${done} delivered • ${Math.max(total - done, 0)} remaining`;
+
 }
 
 
-function makeCard(t, idx, currentKey) {
+
+function makeCard(
+  t,
+  idx,
+  currentKey
+) {
+
   const c =
-    customerByKey(t.customerKey);
+    customerByKey(
+      t.customerKey
+    );
+
 
   const node =
     el("cardTemplate")
@@ -195,16 +363,30 @@ function makeCard(t, idx, currentKey) {
       .firstElementChild
       .cloneNode(true);
 
-  if (!c) return node;
 
-  if (c.key === currentKey) {
-    node.classList.add("current");
+  if (!c) {
+
+    return node;
+
   }
+
+
+  if (
+    c.key === currentKey
+  ) {
+
+    node.classList.add(
+      "current"
+    );
+
+  }
+
 
   node.querySelector(
     ".stop-number"
   ).textContent =
     `STOP ${idx + 1}`;
+
 
   node.querySelector(
     ".stop-title"
@@ -214,21 +396,42 @@ function makeCard(t, idx, currentKey) {
 
   const parts = [];
 
+
   if (t.quantity) {
+
     parts.push(
       `${t.quantity} units`
     );
+
   }
+
 
   if (c.address) {
-    parts.push(c.address);
+
+    parts.push(
+      c.address
+    );
+
   }
 
-  if (c.locationSource === "verified") {
-    parts.push("🟢 Verified GPS");
 
-  } else if (coordsValid(c)) {
-    parts.push("🟡 Approximate GPS");
+  if (
+    c.locationSource ===
+    "verified"
+  ) {
+
+    parts.push(
+      "🟢 Verified GPS"
+    );
+
+  } else if (
+    coordsValid(c)
+  ) {
+
+    parts.push(
+      "🟡 Approximate GPS"
+    );
+
   }
 
 
@@ -249,92 +452,126 @@ function makeCard(t, idx, currentKey) {
       .join("\n");
 
 
-  const b1 =
-    node.querySelector(".call1");
+  const call1 =
+    node.querySelector(
+      ".call1"
+    );
 
-  const b2 =
-    node.querySelector(".call2");
+
+  const call2 =
+    node.querySelector(
+      ".call2"
+    );
 
 
-  b1.onclick =
-    () => openCall(c.phone1);
+  call1.onclick =
+    () =>
+      openCall(c.phone1);
 
-  b2.onclick =
-    () => openCall(c.phone2);
+
+  call2.onclick =
+    () =>
+      openCall(c.phone2);
 
 
   if (!c.phone1) {
-    b1.disabled = true;
+
+    call1.disabled = true;
+
   }
 
+
   if (!c.phone2) {
-    b2.disabled = true;
+
+    call2.disabled = true;
+
   }
 
 
   node.querySelector(
     ".nav"
   ).onclick =
-    () => navigate(c);
+    () =>
+      navigate(c);
 
 
   node.querySelector(
     ".done"
   ).onclick =
-    () => markDone(c.key);
+    () =>
+      markDone(c.key);
 
 
   return node;
+
 }
 
 
+
 function renderCarousel() {
+
   const box =
     el("carousel");
+
 
   box.innerHTML = "";
 
 
   const items =
     [...state.today]
+
       .sort(
-        (a, b) => a.order - b.order
+        (a, b) =>
+          a.order - b.order
       )
+
       .filter(
         x => !x.done
       );
 
 
-  el("emptyRoute").style.display =
-    items.length
-      ? "none"
-      : "block";
+  el("emptyRoute")
+    .style.display =
+      items.length
+        ? "none"
+        : "block";
 
 
   const nextFive =
-    items.slice(0, 5);
+    items.slice(
+      0,
+      5
+    );
 
 
   const currentKey =
-    nextFive[0]?.customerKey;
+    nextFive[0]
+      ?.customerKey;
 
 
   nextFive.forEach(
-    (t, i) =>
+    (t, i) => {
+
       box.appendChild(
         makeCard(
           t,
           i,
           currentKey
         )
-      )
+      );
+
+    }
   );
+
 }
 
 
+
 function renderToday() {
+
   const box =
     el("todayList");
+
 
   box.innerHTML = "";
 
@@ -348,12 +585,12 @@ function renderToday() {
 
 
   if (!items.length) {
+
     box.innerHTML =
-      `<div class="subtle">
-        No stops in today's route.
-      </div>`;
+      '<div class="subtle">No stops in today\'s route.</div>';
 
     return;
+
   }
 
 
@@ -365,7 +602,29 @@ function renderToday() {
           t.customerKey
         );
 
+
       if (!c) return;
+
+
+      let gps = "";
+
+
+      if (
+        c.locationSource ===
+        "verified"
+      ) {
+
+        gps =
+          "🟢 Verified GPS";
+
+      } else if (
+        coordsValid(c)
+      ) {
+
+        gps =
+          "🟡 Approximate GPS";
+
+      }
 
 
       const row =
@@ -379,31 +638,21 @@ function renderToday() {
         (t.done ? " done" : "");
 
 
-      let gpsStatus = "";
-
-      if (
-        c.locationSource ===
-        "verified"
-      ) {
-        gpsStatus =
-          "🟢 Verified GPS";
-
-      } else if (
-        coordsValid(c)
-      ) {
-        gpsStatus =
-          "🟡 Approximate GPS";
-      }
-
-
       row.innerHTML = `
+
         <div class="row-main">
 
           <div class="row-title">
-            ${i + 1}. ${escapeHtml(displayName(c))}
+
+            ${i + 1}.
+            ${escapeHtml(
+              displayName(c)
+            )}
+
           </div>
 
           <div class="row-sub">
+
             ${escapeHtml(
               [
                 t.quantity
@@ -412,12 +661,12 @@ function renderToday() {
 
                 c.address || "",
 
-                gpsStatus
-
+                gps
               ]
                 .filter(Boolean)
                 .join(" • ")
             )}
+
           </div>
 
         </div>
@@ -434,7 +683,11 @@ function renderToday() {
           </button>
 
           <button data-act="done">
-            ${t.done ? "↩ Undo" : "✓ Done"}
+
+            ${t.done
+              ? "↩ Undo"
+              : "✓ Done"}
+
           </button>
 
           <button data-act="remove">
@@ -448,13 +701,15 @@ function renderToday() {
       row.querySelector(
         '[data-act="call"]'
       ).onclick =
-        () => openCall(c.phone1);
+        () =>
+          openCall(c.phone1);
 
 
       row.querySelector(
         '[data-act="nav"]'
       ).onclick =
-        () => navigate(c);
+        () =>
+          navigate(c);
 
 
       row.querySelector(
@@ -462,7 +717,8 @@ function renderToday() {
       ).onclick =
         () => {
 
-          t.done = !t.done;
+          t.done =
+            !t.done;
 
           saveState();
 
@@ -472,16 +728,23 @@ function renderToday() {
       row.querySelector(
         '[data-act="remove"]'
       ).onclick =
-        () => removeFromToday(c.key);
+        () =>
+          removeFromToday(
+            c.key
+          );
 
 
       box.appendChild(row);
+
     }
   );
+
 }
 
 
+
 function renderCustomers() {
+
   const q =
     el("searchInput")
       .value
@@ -492,11 +755,13 @@ function renderCustomers() {
   const box =
     el("customerList");
 
+
   box.innerHTML = "";
 
 
   const list =
     state.customers
+
       .filter(c => {
 
         const hay =
@@ -516,6 +781,7 @@ function renderCustomers() {
         return hay.includes(q);
 
       })
+
       .sort(
         (a, b) =>
           String(a.id)
@@ -530,24 +796,29 @@ function renderCustomers() {
     const inToday =
       state.today.some(
         x =>
-          x.customerKey === c.key
+          x.customerKey ===
+          c.key
       );
 
 
-    let gpsStatus = "";
+    let gps = "";
+
 
     if (
       c.locationSource ===
       "verified"
     ) {
-      gpsStatus =
+
+      gps =
         "🟢 Verified";
 
     } else if (
       coordsValid(c)
     ) {
-      gpsStatus =
+
+      gps =
         "🟡 Approximate";
+
     }
 
 
@@ -557,26 +828,34 @@ function renderCustomers() {
       );
 
 
-    row.className = "row";
+    row.className =
+      "row";
 
 
     row.innerHTML = `
+
       <div class="row-main">
 
         <div class="row-title">
-          ${escapeHtml(displayName(c))}
+
+          ${escapeHtml(
+            displayName(c)
+          )}
+
         </div>
 
         <div class="row-sub">
+
           ${escapeHtml(
             [
               c.address || "",
-              gpsStatus,
+              gps,
               c.phone1 || ""
             ]
               .filter(Boolean)
               .join(" • ")
           )}
+
         </div>
 
       </div>
@@ -589,7 +868,11 @@ function renderCustomers() {
         </button>
 
         <button data-act="today">
-          ${inToday ? "In today ✓" : "+ Today"}
+
+          ${inToday
+            ? "In today ✓"
+            : "+ Today"}
+
         </button>
 
       </div>
@@ -609,40 +892,31 @@ function renderCustomers() {
       () => {
 
         if (inToday) {
-          removeFromToday(c.key);
+
+          removeFromToday(
+            c.key
+          );
 
         } else {
+
           addToToday(c);
+
         }
 
       };
 
 
     box.appendChild(row);
+
   });
-}
 
-
-function escapeHtml(s) {
-  return String(
-    s ?? ""
-  ).replace(
-    /[&<>"']/g,
-    ch => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;"
-    }[ch])
-  );
 }
 
 
 
-// ---------------------------------------------------
-// ADDRESS SEARCH
-// ---------------------------------------------------
+// ----------------------------------------------------
+// ADDRESS LOOKUP
+// ----------------------------------------------------
 
 async function findAddressLocation() {
 
@@ -653,14 +927,19 @@ async function findAddressLocation() {
 
 
   if (!address) {
-    return alert(
+
+    alert(
       "Enter an address, village or landmark first."
     );
+
+    return;
+
   }
 
 
   const btn =
     el("findLocationBtn");
+
 
   const status =
     el("locationStatus");
@@ -671,6 +950,7 @@ async function findAddressLocation() {
   btn.textContent =
     "Searching…";
 
+
   status.textContent =
     "Looking for the address…";
 
@@ -678,44 +958,48 @@ async function findAddressLocation() {
   try {
 
     const query =
-      /greece|ελλάδα/i.test(address)
+      /greece|ελλάδα/i.test(
+        address
+      )
         ? address
         : `${address}, Greece`;
 
 
     const url =
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=gr&q=${encodeURIComponent(query)}`;
+      "https://nominatim.openstreetmap.org/search" +
+      "?format=jsonv2" +
+      "&limit=5" +
+      "&countrycodes=gr" +
+      "&q=" +
+      encodeURIComponent(query);
 
 
-    const res =
-      await fetch(
-        url,
-        {
-          headers: {
-            "Accept":
-              "application/json"
-          }
-        }
-      );
+    const response =
+      await fetch(url);
 
 
-    if (!res.ok) {
+    if (!response.ok) {
+
       throw new Error(
-        `Search failed (${res.status})`
+        "Address search failed"
       );
+
     }
 
 
     const results =
-      await res.json();
+      await response.json();
 
 
-    if (!results.length) {
+    if (
+      !results.length
+    ) {
 
       status.textContent =
-        "No location found. Add more detail or use your current GPS when you arrive.";
+        "No location found.";
 
       return;
+
     }
 
 
@@ -740,19 +1024,17 @@ async function findAddressLocation() {
 
 
     status.textContent =
-      `🟡 Approximate location: ${best.display_name}`;
+      "🟡 Approximate location: " +
+      best.display_name;
 
 
-  } catch (err) {
+  } catch (error) {
+
+    console.error(error);
+
 
     status.textContent =
-      "Could not search the address.";
-
-    alert(
-      "Address lookup failed: " +
-      err.message
-    );
-
+      "Could not find address.";
 
   } finally {
 
@@ -760,16 +1042,17 @@ async function findAddressLocation() {
 
     btn.textContent =
       "🔎 Find location";
+
   }
+
 }
 
 
 
-// ---------------------------------------------------
-// CHECK LOCATION IN GOOGLE MAPS
-// ---------------------------------------------------
-
 function checkEnteredLocation() {
+
+  let q = "";
+
 
   const lat =
     Number(
@@ -783,14 +1066,11 @@ function checkEnteredLocation() {
     );
 
 
-  let q = "";
-
-
   if (
-    el("lat").value !== "" &&
-    el("lng").value !== "" &&
     Number.isFinite(lat) &&
-    Number.isFinite(lng)
+    Number.isFinite(lng) &&
+    el("lat").value !== "" &&
+    el("lng").value !== ""
   ) {
 
     q =
@@ -802,39 +1082,49 @@ function checkEnteredLocation() {
       el("customerAddress")
         .value
         .trim();
+
   }
 
 
   if (!q) {
 
-    return alert(
-      "Enter an address or save/find a GPS location first."
+    alert(
+      "No location entered."
     );
+
+    return;
 
   }
 
 
   window.open(
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+    "https://www.google.com/maps/search/?api=1&query=" +
+    encodeURIComponent(q),
     "_blank",
     "noopener"
   );
+
 }
 
 
 
-// ---------------------------------------------------
-// OPEN CUSTOMER FORM
-// ---------------------------------------------------
+// ----------------------------------------------------
+// CUSTOMER FORM
+// ----------------------------------------------------
 
-function openCustomerDialog(c = null) {
+function openCustomerDialog(
+  c = null
+) {
 
   form.reset();
 
 
-  el("serviceMin").value = 7;
+  el("serviceMin")
+    .value = 7;
 
-  el("quantity").value = "";
+
+  el("quantity")
+    .value = "";
 
 
   el("locationStatus")
@@ -858,48 +1148,59 @@ function openCustomerDialog(c = null) {
         "Edit customer";
 
 
-    el("editKey").value =
-      c.key;
+    el("editKey")
+      .value =
+        c.key;
 
 
-    el("customerId").value =
-      c.id || "";
+    el("customerId")
+      .value =
+        c.id || "";
 
 
-    el("customerName").value =
-      c.name || "";
+    el("customerName")
+      .value =
+        c.name || "";
 
 
-    el("customerAddress").value =
-      c.address || "";
+    el("customerAddress")
+      .value =
+        c.address || "";
 
 
-    el("phone1").value =
-      c.phone1 || "";
+    el("phone1")
+      .value =
+        c.phone1 || "";
 
 
-    el("phone2").value =
-      c.phone2 || "";
+    el("phone2")
+      .value =
+        c.phone2 || "";
 
 
-    el("lat").value =
-      c.lat ?? "";
+    el("lat")
+      .value =
+        c.lat ?? "";
 
 
-    el("lng").value =
-      c.lng ?? "";
+    el("lng")
+      .value =
+        c.lng ?? "";
 
 
-    el("serviceMin").value =
-      c.serviceMin ?? 7;
+    el("serviceMin")
+      .value =
+        c.serviceMin ?? 7;
 
 
-    el("companyNotes").value =
-      c.companyNotes || "";
+    el("companyNotes")
+      .value =
+        c.companyNotes || "";
 
 
-    el("myNotes").value =
-      c.myNotes || "";
+    el("myNotes")
+      .value =
+        c.myNotes || "";
 
 
     if (
@@ -915,7 +1216,6 @@ function openCustomerDialog(c = null) {
       el("locationStatus")
         .textContent =
           "🟢 Verified truck position";
-
 
     } else if (
       coordsValid(c)
@@ -933,13 +1233,15 @@ function openCustomerDialog(c = null) {
     }
 
 
-    const t =
-      todayItemByKey(c.key);
+    const today =
+      todayItemByKey(
+        c.key
+      );
 
 
-    el("quantity").value =
-      t?.quantity ?? "";
-
+    el("quantity")
+      .value =
+        today?.quantity ?? "";
 
   } else {
 
@@ -948,26 +1250,23 @@ function openCustomerDialog(c = null) {
         "New customer";
 
 
-    el("editKey").value =
-      "";
+    el("editKey")
+      .value = "";
 
   }
 
 
   dialog.showModal();
+
 }
 
 
 
-// ---------------------------------------------------
-// SAVE CUSTOMER
-// ---------------------------------------------------
-
 form.addEventListener(
   "submit",
-  e => {
+  event => {
 
-    e.preventDefault();
+    event.preventDefault();
 
 
     const key =
@@ -979,7 +1278,7 @@ form.addEventListener(
       customerByKey(key);
 
 
-    const obj = {
+    const customer = {
 
       key,
 
@@ -1026,7 +1325,8 @@ form.addEventListener(
         el("locationStatus")
           .dataset.source ||
 
-        existing?.locationSource ||
+        existing
+          ?.locationSource ||
 
         (
           el("lat").value &&
@@ -1038,7 +1338,7 @@ form.addEventListener(
       serviceMin:
         Number(
           el("serviceMin")
-            .value || 0
+            .value || 7
         ),
 
       companyNotes:
@@ -1058,39 +1358,57 @@ form.addEventListener(
 
       Object.assign(
         existing,
-        obj
+        customer
       );
 
     } else {
 
       state.customers.push(
-        obj
+        customer
       );
 
     }
 
 
-    const qty =
+    const quantity =
       el("quantity").value;
 
 
-    if (qty !== "") {
+    if (
+      quantity !== ""
+    ) {
 
-      if (
-        !todayItemByKey(key)
-      ) {
-
-        addToToday(obj);
-
-      }
-
-
-      const t =
+      let today =
         todayItemByKey(key);
 
 
-      if (t) {
-        t.quantity = qty;
+      if (!today) {
+
+        today = {
+
+          customerKey:
+            key,
+
+          quantity,
+
+          done:
+            false,
+
+          order:
+            state.today.length
+
+        };
+
+
+        state.today.push(
+          today
+        );
+
+      } else {
+
+        today.quantity =
+          quantity;
+
       }
 
     }
@@ -1105,20 +1423,22 @@ form.addEventListener(
 
 
 
-// ---------------------------------------------------
-// SAVE PHYSICAL GPS POSITION
-// ---------------------------------------------------
+// ----------------------------------------------------
+// PHYSICAL GPS
+// ----------------------------------------------------
 
-el("saveGpsBtn").onclick =
-  () => {
+el("saveGpsBtn")
+  .onclick = () => {
 
     if (
       !navigator.geolocation
     ) {
 
-      return alert(
-        "GPS is not available in this browser."
+      alert(
+        "GPS is not available."
       );
+
+      return;
 
     }
 
@@ -1133,14 +1453,18 @@ el("saveGpsBtn").onclick =
 
         pos => {
 
-          el("lat").value =
-            pos.coords.latitude
-              .toFixed(6);
+          el("lat")
+            .value =
+              pos.coords
+                .latitude
+                .toFixed(6);
 
 
-          el("lng").value =
-            pos.coords.longitude
-              .toFixed(6);
+          el("lng")
+            .value =
+              pos.coords
+                .longitude
+                .toFixed(6);
 
 
           el("locationStatus")
@@ -1150,13 +1474,14 @@ el("saveGpsBtn").onclick =
 
           const accuracy =
             Math.round(
-              pos.coords.accuracy || 0
+              pos.coords
+                .accuracy || 0
             );
 
 
           el("locationStatus")
             .textContent =
-              `🟢 Verified truck position${accuracy ? ` • GPS ±${accuracy} m` : ""}`;
+              `🟢 Verified truck position • GPS ±${accuracy} m`;
 
 
           el("saveGpsBtn")
@@ -1166,11 +1491,11 @@ el("saveGpsBtn").onclick =
         },
 
 
-        err => {
+        error => {
 
           alert(
             "Could not get GPS: " +
-            err.message
+            error.message
           );
 
 
@@ -1182,9 +1507,14 @@ el("saveGpsBtn").onclick =
 
 
         {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0
+          enableHighAccuracy:
+            true,
+
+          timeout:
+            15000,
+
+          maximumAge:
+            0
         }
 
       );
@@ -1193,110 +1523,594 @@ el("saveGpsBtn").onclick =
 
 
 
-// ---------------------------------------------------
-// BUTTONS
-// ---------------------------------------------------
+// ----------------------------------------------------
+// BUILD ROUTE FROM IDS
+// ----------------------------------------------------
 
-el("findLocationBtn").onclick =
-  findAddressLocation;
+el("buildRouteBtn")
+  .onclick = () => {
 
-
-el("checkMapBtn").onclick =
-  checkEnteredLocation;
-
-
-el("newCustomerBtn").onclick =
-  () =>
-    openCustomerDialog();
+    const text =
+      el("routeInput")
+        .value
+        .trim();
 
 
-el("searchInput").oninput =
-  renderCustomers;
+    if (!text) {
 
-
-
-el("completeCurrentBtn").onclick =
-  () => {
-
-    const cur =
-      currentUndone();
-
-
-    if (!cur) {
-
-      return alert(
-        "No remaining stop."
+      alert(
+        "Enter at least one customer ID."
       );
 
-    }
-
-
-    markDone(
-      cur.customerKey
-    );
-
-  };
-
-
-
-el("resetTodayBtn").onclick =
-  () => {
-
-    if (
-      !confirm(
-        "Clear today's route? Customer database will stay untouched."
-      )
-    ) {
       return;
+
     }
 
 
-    state.today = [];
+    const lines =
+      text
+        .split("\n")
+        .map(
+          x => x.trim()
+        )
+        .filter(Boolean);
 
-    saveState();
 
-  };
+    const added = [];
+
+    const missing = [];
+
+    const already = [];
 
 
+    lines.forEach(line => {
 
-// ---------------------------------------------------
-// SIMPLE ROUTE OPTIMIZER
-// ---------------------------------------------------
+      const parts =
+        line
+          .split(/[\s,;]+/)
+          .filter(Boolean);
 
-el("optimizeBtn").onclick =
-  () => {
 
-    const pending =
-      [...state.today]
-        .filter(
-          x => !x.done
+      const id =
+        String(
+          parts[0] || ""
+        ).trim();
+
+
+      const quantity =
+        String(
+          parts[1] || ""
+        ).trim();
+
+
+      if (!id) return;
+
+
+      const customer =
+        state.customers.find(
+          c =>
+            String(c.id)
+              .trim()
+              .toLowerCase() ===
+            id.toLowerCase()
         );
 
 
+      if (!customer) {
+
+        missing.push(id);
+
+        return;
+
+      }
+
+
+      let today =
+        todayItemByKey(
+          customer.key
+        );
+
+
+      if (today) {
+
+        already.push(id);
+
+      } else {
+
+        today = {
+
+          customerKey:
+            customer.key,
+
+          quantity,
+
+          done:
+            false,
+
+          order:
+            state.today.length
+
+        };
+
+
+        state.today.push(
+          today
+        );
+
+
+        added.push(id);
+
+      }
+
+
+      if (
+        quantity !== ""
+      ) {
+
+        today.quantity =
+          quantity;
+
+      }
+
+    });
+
+
+    saveState();
+
+
+    let message =
+      `${added.length} customers added.`;
+
+
     if (
-      pending.length < 2
+      already.length
     ) {
-      return;
+
+      message +=
+        ` ${already.length} already in route.`;
+
     }
 
 
-    const usable =
-      pending.filter(
-        t =>
-          coordsValid(
-            customerByKey(
-              t.customerKey
-            )
-          )
+    if (
+      missing.length
+    ) {
+
+      message +=
+        ` ⚠️ Unknown IDs: ${missing.join(", ")}`;
+
+    }
+
+
+    el("routeBuildResult")
+      .textContent =
+        message;
+
+  };
+
+
+
+// ----------------------------------------------------
+// OPENROUTESERVICE API KEY
+// ----------------------------------------------------
+
+function loadApiKey() {
+
+  const key =
+    localStorage.getItem(
+      API_KEY_STORAGE
+    ) || "";
+
+
+  el("apiKeyInput")
+    .value =
+      key;
+
+
+  el("apiKeyStatus")
+    .textContent =
+      key
+        ? "✓ API key saved on this device."
+        : "No API key saved yet.";
+
+}
+
+
+
+el("saveApiKeyBtn")
+  .onclick = () => {
+
+    const key =
+      el("apiKeyInput")
+        .value
+        .trim();
+
+
+    if (!key) {
+
+      alert(
+        "Paste your API key first."
+      );
+
+      return;
+
+    }
+
+
+    localStorage.setItem(
+      API_KEY_STORAGE,
+      key
+    );
+
+
+    el("apiKeyStatus")
+      .textContent =
+        "✓ API key saved on this device.";
+
+};
+
+
+
+el("showApiKeyBtn")
+  .onclick = () => {
+
+    const input =
+      el("apiKeyInput");
+
+
+    input.type =
+      input.type ===
+      "password"
+        ? "text"
+        : "password";
+
+};
+
+
+
+// ----------------------------------------------------
+// REAL ROAD OPTIMIZATION
+// ----------------------------------------------------
+
+async function optimizeRealRoute() {
+
+  const key =
+    localStorage.getItem(
+      API_KEY_STORAGE
+    );
+
+
+  if (!key) {
+
+    alert(
+      "Save your openrouteservice API key first."
+    );
+
+    return;
+
+  }
+
+
+  const pending =
+    [...state.today]
+      .sort(
+        (a, b) =>
+          a.order - b.order
+      )
+      .filter(
+        x => !x.done
       );
 
 
+  if (
+    pending.length < 2
+  ) {
+
+    alert(
+      "You need at least 2 remaining stops."
+    );
+
+    return;
+
+  }
+
+
+  const missingGps =
+    pending.filter(
+      item => {
+
+        const customer =
+          customerByKey(
+            item.customerKey
+          );
+
+
+        return !coordsValid(
+          customer
+        );
+
+      }
+    );
+
+
+  if (
+    missingGps.length
+  ) {
+
+    const ids =
+      missingGps
+        .map(
+          item =>
+            customerByKey(
+              item.customerKey
+            )?.id
+        )
+        .filter(Boolean);
+
+
+    alert(
+      "These customers have no GPS location:\n\n" +
+      ids.join(", ")
+    );
+
+
+    return;
+
+  }
+
+
+  if (
+    !navigator.geolocation
+  ) {
+
+    alert(
+      "Current GPS is not available."
+    );
+
+    return;
+
+  }
+
+
+  const button =
+    el("optimizeBtn");
+
+
+  button.disabled = true;
+
+  button.textContent =
+    "Getting truck GPS…";
+
+
+  el("optimizerStatus")
+    .textContent =
+      "Getting your current position…";
+
+
+  try {
+
+    const position =
+      await new Promise(
+        (resolve, reject) => {
+
+          navigator.geolocation
+            .getCurrentPosition(
+
+              resolve,
+
+              reject,
+
+              {
+                enableHighAccuracy:
+                  true,
+
+                timeout:
+                  15000,
+
+                maximumAge:
+                  0
+              }
+
+            );
+
+        }
+      );
+
+
+    const start = [
+
+      position.coords
+        .longitude,
+
+      position.coords
+        .latitude
+
+    ];
+
+
+    button.textContent =
+      "Optimizing roads…";
+
+
+    el("optimizerStatus")
+      .textContent =
+        "Calculating best road order…";
+
+
+    const jobToCustomer =
+      new Map();
+
+
+    const jobs =
+      pending.map(
+        (item, index) => {
+
+          const customer =
+            customerByKey(
+              item.customerKey
+            );
+
+
+          const jobId =
+            index + 1;
+
+
+          jobToCustomer.set(
+            jobId,
+            item.customerKey
+          );
+
+
+          return {
+
+            id:
+              jobId,
+
+            location: [
+
+              Number(
+                customer.lng
+              ),
+
+              Number(
+                customer.lat
+              )
+
+            ],
+
+            service:
+              Math.max(
+                0,
+                Math.round(
+                  Number(
+                    customer.serviceMin ||
+                    7
+                  ) * 60
+                )
+              )
+
+          };
+
+        }
+      );
+
+
+    const requestBody = {
+
+      jobs,
+
+      vehicles: [
+
+        {
+
+          id:
+            1,
+
+          profile:
+            "driving-car",
+
+          start:
+            start
+
+        }
+
+      ]
+
+    };
+
+
+    const response =
+      await fetch(
+        ORS_OPTIMIZATION_URL,
+        {
+
+          method:
+            "POST",
+
+          headers: {
+
+            "Authorization":
+              key,
+
+            "Content-Type":
+              "application/json",
+
+            "Accept":
+              "application/json"
+
+          },
+
+          body:
+            JSON.stringify(
+              requestBody
+            )
+
+        }
+      );
+
+
+    const result =
+      await response.json();
+
+
+    if (!response.ok) {
+
+      console.error(
+        result
+      );
+
+
+      throw new Error(
+        result?.error ||
+        result?.message ||
+        `API error ${response.status}`
+      );
+
+    }
+
+
     if (
-      usable.length < 2
+      !result.routes ||
+      !result.routes.length
     ) {
 
-      return alert(
-        "At least two remaining customers need saved GPS coordinates."
+      throw new Error(
+        "Optimizer returned no route."
+      );
+
+    }
+
+
+    const route =
+      result.routes[0];
+
+
+    const orderedKeys =
+      route.steps
+
+        .filter(
+          step =>
+            step.type ===
+            "job"
+        )
+
+        .map(
+          step =>
+            jobToCustomer.get(
+              step.job
+            )
+        )
+
+        .filter(Boolean);
+
+
+    if (
+      orderedKeys.length !==
+      pending.length
+    ) {
+
+      throw new Error(
+        "Not every customer was assigned by the optimizer."
       );
 
     }
@@ -1304,182 +2118,200 @@ el("optimizeBtn").onclick =
 
     const done =
       [...state.today]
+
         .filter(
           x => x.done
         )
+
         .sort(
           (a, b) =>
             a.order - b.order
         );
 
 
-    let pool =
-      usable.map(
-        t => ({
-          t,
-          c:
-            customerByKey(
-              t.customerKey
-            )
-        })
-      );
-
-
-    let start =
-      pool[0];
-
-
-    const current =
-      currentUndone();
-
-
-    if (
-      current &&
-      coordsValid(
-        customerByKey(
-          current.customerKey
-        )
-      )
-    ) {
-
-      start =
-        pool.find(
-          x =>
-            x.t.customerKey ===
-            current.customerKey
-        ) || start;
-
-    }
-
-
-    const ordered =
-      [start];
-
-
-    pool =
-      pool.filter(
-        x => x !== start
-      );
-
-
-    while (
-      pool.length
-    ) {
-
-      const last =
-        ordered[
-          ordered.length - 1
-        ].c;
-
-
-      let bestIdx = 0;
-
-      let bestDist =
-        Infinity;
-
-
-      pool.forEach(
-        (x, i) => {
-
-          const d =
-            distanceKm(
-
-              {
-                lat:
-                  Number(
-                    last.lat
-                  ),
-
-                lng:
-                  Number(
-                    last.lng
-                  )
-              },
-
-              {
-                lat:
-                  Number(
-                    x.c.lat
-                  ),
-
-                lng:
-                  Number(
-                    x.c.lng
-                  )
-              }
-
-            );
-
-
-          if (
-            d < bestDist
-          ) {
-
-            bestDist = d;
-            bestIdx = i;
-
-          }
-
-        }
-      );
-
-
-      ordered.push(
-        pool.splice(
-          bestIdx,
-          1
-        )[0]
-      );
-
-    }
-
-
-    const noGps =
-      pending.filter(
-        t =>
-          !coordsValid(
-            customerByKey(
-              t.customerKey
-            )
+    const optimized =
+      orderedKeys.map(
+        key =>
+          state.today.find(
+            item =>
+              item.customerKey ===
+              key &&
+              !item.done
           )
       );
 
 
-    const seq = [
+    const newOrder = [
+
       ...done,
-      ...ordered.map(
-        x => x.t
-      ),
-      ...noGps
+
+      ...optimized
+
     ];
 
 
-    seq.forEach(
-      (x, i) =>
-        x.order = i
+    newOrder.forEach(
+      (item, index) =>
+        item.order =
+          index
     );
 
 
-    state.today = seq;
+    state.today =
+      newOrder;
 
 
     saveState();
 
 
+    const km =
+      Number(
+        route.distance || 0
+      ) / 1000;
+
+
+    const minutes =
+      Math.round(
+        Number(
+          route.duration || 0
+        ) / 60
+      );
+
+
+    const accuracy =
+      Math.round(
+        position.coords
+          .accuracy || 0
+      );
+
+
+    el("optimizerStatus")
+      .textContent =
+        `✓ Optimized from current truck position • ${km.toFixed(1)} km • about ${minutes} min including service time • GPS ±${accuracy} m`;
+
+
+  } catch (error) {
+
+    console.error(
+      error
+    );
+
+
+    el("optimizerStatus")
+      .textContent =
+        "⚠ Optimization failed: " +
+        error.message;
+
+
     alert(
-      "Route reordered using GPS proximity. This is only a starting point and is not yet truck-aware."
+      "Optimization failed:\n\n" +
+      error.message
+    );
+
+
+  } finally {
+
+    button.disabled = false;
+
+    button.textContent =
+      "🚚 Optimize route";
+
+  }
+
+}
+
+
+
+el("optimizeBtn")
+  .onclick =
+    optimizeRealRoute;
+
+
+
+// ----------------------------------------------------
+// OTHER BUTTONS
+// ----------------------------------------------------
+
+el("findLocationBtn")
+  .onclick =
+    findAddressLocation;
+
+
+el("checkMapBtn")
+  .onclick =
+    checkEnteredLocation;
+
+
+el("newCustomerBtn")
+  .onclick =
+    () =>
+      openCustomerDialog();
+
+
+el("searchInput")
+  .oninput =
+    renderCustomers;
+
+
+el("completeCurrentBtn")
+  .onclick = () => {
+
+    const current =
+      currentUndone();
+
+
+    if (!current) {
+
+      alert(
+        "No remaining stop."
+      );
+
+      return;
+
+    }
+
+
+    markDone(
+      current.customerKey
     );
 
   };
 
 
+el("resetTodayBtn")
+  .onclick = () => {
 
-// ---------------------------------------------------
+    if (
+      !confirm(
+        "Clear today's route? Customer database will stay untouched."
+      )
+    ) {
+
+      return;
+
+    }
+
+
+    state.today = [];
+
+
+    saveState();
+
+
+    el("optimizerStatus")
+      .textContent =
+        "Route not optimized yet.";
+
+  };
+
+
+
+// ----------------------------------------------------
 // BACKUP
-// ---------------------------------------------------
+// ----------------------------------------------------
 
-el("exportBtn").onclick =
-  () => {
+el("exportBtn")
+  .onclick = () => {
 
     const blob =
       new Blob(
@@ -1510,7 +2342,11 @@ el("exportBtn").onclick =
 
 
     a.download =
-      `delivery-helper-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      "delivery-helper-backup-" +
+      new Date()
+        .toISOString()
+        .slice(0, 10) +
+      ".json";
 
 
     a.click();
@@ -1524,68 +2360,76 @@ el("exportBtn").onclick =
 
 
 
-el("importInput").onchange =
-  async e => {
+el("importInput")
+  .onchange =
+    async event => {
 
-    const file =
-      e.target.files?.[0];
-
-
-    if (!file) return;
-
-
-    try {
-
-      const imported =
-        JSON.parse(
-          await file.text()
-        );
+      const file =
+        event.target
+          .files?.[0];
 
 
-      if (
-        !imported.customers ||
-        !imported.today
-      ) {
+      if (!file) return;
 
-        throw new Error(
-          "Invalid backup file"
+
+      try {
+
+        const imported =
+          JSON.parse(
+            await file.text()
+          );
+
+
+        if (
+          !imported.customers ||
+          !imported.today
+        ) {
+
+          throw new Error(
+            "Invalid backup file"
+          );
+
+        }
+
+
+        state =
+          imported;
+
+
+        saveState();
+
+
+      } catch (error) {
+
+        alert(
+          "Import failed: " +
+          error.message
         );
 
       }
 
 
-      state = imported;
+      event.target
+        .value = "";
 
-      saveState();
-
-
-    } catch (err) {
-
-      alert(
-        "Import failed: " +
-        err.message
-      );
-
-    }
-
-
-    e.target.value = "";
-
-  };
+    };
 
 
 
-// ---------------------------------------------------
-// INSTALL APP
-// ---------------------------------------------------
+// ----------------------------------------------------
+// INSTALL / SERVICE WORKER
+// ----------------------------------------------------
 
 window.addEventListener(
   "beforeinstallprompt",
-  e => {
+  event => {
 
-    e.preventDefault();
+    event.preventDefault();
 
-    deferredPrompt = e;
+
+    deferredPrompt =
+      event;
+
 
     el("installBtn")
       .classList
@@ -1596,213 +2440,58 @@ window.addEventListener(
 
 
 
-el("installBtn").onclick =
-  async () => {
+el("installBtn")
+  .onclick =
+    async () => {
 
-    if (
-      !deferredPrompt
-    ) {
-      return;
-    }
+      if (
+        !deferredPrompt
+      ) {
 
+        return;
 
-    deferredPrompt.prompt();
+      }
 
 
-    await deferredPrompt
-      .userChoice;
+      deferredPrompt.prompt();
 
 
-    deferredPrompt = null;
+      await deferredPrompt
+        .userChoice;
 
 
-    el("installBtn")
-      .classList
-      .add("hidden");
+      deferredPrompt =
+        null;
 
-  };
 
-// ---------------------------------------------------
-// BUILD TODAY'S ROUTE FROM CUSTOMER IDs
-// ---------------------------------------------------
+      el("installBtn")
+        .classList
+        .add("hidden");
 
-el("buildRouteBtn").onclick = () => {
+    };
 
-  const text =
-    el("routeInput")
-      .value
-      .trim();
 
-
-  if (!text) {
-
-    alert(
-      "Enter at least one customer ID."
-    );
-
-    return;
-  }
-
-
-  const lines =
-    text
-      .split("\n")
-      .map(line => line.trim())
-      .filter(Boolean);
-
-
-  const found = [];
-
-  const missing = [];
-
-  const alreadyThere = [];
-
-
-  lines.forEach(line => {
-
-    // Allows:
-    // 18452 10
-    // 18452,10
-    // 18452;10
-
-    const parts =
-      line
-        .split(/[\s,;]+/)
-        .filter(Boolean);
-
-
-    const id =
-      String(parts[0] || "")
-        .trim();
-
-
-    const quantity =
-      String(parts[1] || "")
-        .trim();
-
-
-    if (!id) {
-      return;
-    }
-
-
-    const customer =
-      state.customers.find(
-        c =>
-          String(c.id)
-            .trim()
-            .toLowerCase() ===
-          id.toLowerCase()
-      );
-
-
-    if (!customer) {
-
-      missing.push(id);
-
-      return;
-    }
-
-
-    let todayItem =
-      todayItemByKey(
-        customer.key
-      );
-
-
-    if (todayItem) {
-
-      alreadyThere.push(id);
-
-    } else {
-
-      todayItem = {
-        customerKey:
-          customer.key,
-
-        quantity:
-          quantity,
-
-        done:
-          false,
-
-        order:
-          state.today.length
-      };
-
-
-      state.today.push(
-        todayItem
-      );
-
-
-      found.push(id);
-
-    }
-
-
-    if (
-      quantity !== ""
-    ) {
-
-      todayItem.quantity =
-        quantity;
-
-    }
-
-  });
-
-
-  saveState();
-
-
-  let message =
-    `${found.length} customers added.`;
-
-
-  if (
-    alreadyThere.length
-  ) {
-
-    message +=
-      ` ${alreadyThere.length} already in route.`;
-
-  }
-
-
-  if (
-    missing.length
-  ) {
-
-    message +=
-      ` ⚠️ Unknown IDs: ${missing.join(", ")}`;
-
-  }
-
-
-  el("routeBuildResult")
-    .textContent =
-      message;
-
-};
-
-// ---------------------------------------------------
-// SERVICE WORKER
-// ---------------------------------------------------
 
 if (
-  "serviceWorker"
-  in navigator
+  "serviceWorker" in
+  navigator
 ) {
 
-  navigator.serviceWorker
+  navigator
+    .serviceWorker
     .register("./sw.js")
-    .catch(() => {});
+    .catch(
+      console.error
+    );
 
 }
 
 
 
-// START APP
+// ----------------------------------------------------
+// START
+// ----------------------------------------------------
+
+loadApiKey();
 
 render();
