@@ -118,15 +118,48 @@ function cleanPhone(p) {
 
 function coordsValid(c) {
 
-  return (
-    Number.isFinite(
-      Number(c?.lat)
-    ) &&
-    Number.isFinite(
-      Number(c?.lng)
-    )
-  );
+  if (!c) {
+    return false;
+  }
 
+  if (
+    c.lat === null ||
+    c.lat === undefined ||
+    c.lat === "" ||
+    c.lng === null ||
+    c.lng === undefined ||
+    c.lng === ""
+  ) {
+    return false;
+  }
+
+  const lat = Number(c.lat);
+  const lng = Number(c.lng);
+
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    return false;
+  }
+
+  if (
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return false;
+  }
+
+  if (
+    lat === 0 &&
+    lng === 0
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 
