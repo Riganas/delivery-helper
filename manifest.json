@@ -1,0 +1,10 @@
+{
+  "name": "Βοηθός Διανομής",
+  "short_name": "Delivery Helper",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "lang": "el"
+}
