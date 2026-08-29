@@ -745,3 +745,32 @@ button:disabled {
   border-color: #4a515b !important;
   opacity: 1;
 }
+
+/* =========================================
+   CUSTOMER SEARCH - DARK / AMBER
+   ========================================= */
+
+#searchInput,
+.customer-list + input,
+input.search,
+.search {
+  background: #12161b !important;
+  color: #ffffff !important;
+  border: 2px solid #ffb300 !important;
+  caret-color: #ffb300;
+}
+
+#searchInput::placeholder,
+input.search::placeholder,
+.search::placeholder {
+  color: #9da5b0 !important;
+  opacity: 1;
+}
+
+#searchInput:focus,
+input.search:focus,
+.search:focus {
+  outline: none !important;
+  border-color: #ffc229 !important;
+  box-shadow: 0 0 0 3px rgba(255, 179, 0, 0.15) !important;
+}
